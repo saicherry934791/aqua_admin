@@ -1,324 +1,801 @@
-import { Star } from "lucide-react-native"
-import React from "react"
-import { Alert, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native"
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
-import { DynamicForm, type FormSection } from "../../components/dynamic-form/dynamic-form"
-import { PolygonSelector } from "../../components/ui/polygon-selector"
+import { Button } from '@react-navigation/elements';
+import { router, useNavigation } from 'expo-router';
+import { Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity } from 'lucide-react-native';
+import React, { useContext, useLayoutEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions } from 'react-native';
+import { SheetManager } from 'react-native-actions-sheet';
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
+import { DistributionPieChart } from '@/lib/components/grphs/DistributionPieChart';
+import { ComparisonLineChart } from '@/lib/components/grphs/ComparisonLineChart';
+import { ComparisonBarChart } from '@/lib/components/grphs/ComparisonBarChart';
+import { BarChartData, LineChartData } from '@/lib/components/grphs/ChartTypes';
 
-// Custom rating component example
-const RatingComponent = ({ label, value, onChange, error }: any) => {
-  const handlePress = () => {
-    const options = ["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars", "Cancel"]
+const { width: screenWidth } = Dimensions.get('window');
 
-    Alert.alert(
-      "Select Rating",
-      "",
-      [
-        { text: options[0], onPress: () => onChange(1) },
-        { text: options[1], onPress: () => onChange(2) },
-        { text: options[2], onPress: () => onChange(3) },
-        { text: options[3], onPress: () => onChange(4) },
-        { text: options[4], onPress: () => onChange(5) },
-        { text: options[5], style: "cancel" },
-      ],
-      { cancelable: true }
-    )
-  }
-
-  return (
-    <View style={{ marginBottom: 16 }}>
-      {label && <Text style={{ fontSize: 14, fontWeight: "500", marginBottom: 6, fontFamily: 'PlusJakartaSans_600SemiBold' }}>{label}</Text>}
-      <TouchableOpacity
-        onPress={handlePress}
-        style={{
-          backgroundColor: "#f4f4f5",
-          borderColor: error ? "#ef4444" : "#e4e4e7",
-          borderWidth: 1,
-          borderRadius: 8,
-          padding: 12,
-          width: "100%",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text style={{ fontFamily: 'PlusJakartaSans_400Regular', color: value ? "#18181b" : "#71717a" }}>
-          {value ? (
-            <>
-              <Star size={16} color="#FFD700" fill="#FFD700" /> {value} ({value}/5)
-            </>
-          ) : (
-            "Select Rating"
-          )}
-        </Text>
-        <Star size={16} color="#71717a" />
-      </TouchableOpacity>
-      {error && <Text style={{ color: "#ef4444", fontSize: 12, marginTop: 4, fontFamily: 'PlusJakartaSans_400Regular' }}>{error}</Text>}
+// Enhanced Reusable Components
+const DashboardTab = ({ title, active, onPress, icon: Icon }: {
+  title: string,
+  active: boolean,
+  onPress: () => void,
+  icon?: any
+}) => (
+  <TouchableOpacity
+    style={[
+      styles.tab,
+      active ? styles.activeTab : {}
+    ]}
+    onPress={onPress}
+  >
+    <View style={styles.tabContent}>
+      {Icon && <Icon size={16} color={active ? '#007bff' : '#666'} style={styles.tabIcon} />}
+      <Text style={[
+        styles.tabText,
+        active ? styles.activeTabText : {}
+      ]}>
+        {title}
+      </Text>
     </View>
-  )
-}
+  </TouchableOpacity>
+);
 
-const formSections: FormSection[] = [
-  {
-    id: "basic_info",
-    title: "Basic Information",
-    fields: [
-      {
-        id: "name",
-        type: "text",
-        label: "Full Name",
-        placeholder: "Enter your full name",
-        required: true,
-        validation: {
-          min: 2,
-          max: 50,
-        },
-      },
-      {
-        id: "email",
-        type: "text",
-        label: "Email",
-        placeholder: "Enter your email",
-        required: true,
-        validation: {
-          pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-          custom: (value: string) => {
-            if (value && !value.includes("@")) {
-              return "Please enter a valid email address"
-            }
-            return null
-          },
-        },
-      },
-      {
-        id: "description",
-        type: "textarea",
-        label: "Description",
-        placeholder: "Tell us about yourself",
-        required: true,
-        props: { rows: 4 },
-        validation: {
-          max: 500,
-          min: 100
-        },
-      },
-      {
-        id: "category",
-        type: "select",
-        label: "Category",
-        placeholder: "Select a category",
-        required: true,
-        options: [
-          { label: "Business", value: "business" },
-          { label: "Personal", value: "personal" },
-          { label: "Other", value: "other" },
-        ],
-      },
-      {
-        id: "skills",
-        type: "multiselect",
-        label: "Skills",
-        placeholder: "Select your skills",
-        required: true,
-        options: [
-          { label: "React Native", value: "react-native" },
-          { label: "JavaScript", value: "javascript" },
-          { label: "TypeScript", value: "typescript" },
-          { label: "Node.js", value: "nodejs" },
-          { label: "React.js", value: "reactjs" },
-          { label: "Vue.js", value: "vuejs" },
-          { label: "Angular", value: "angular" },
-          { label: "Next.js", value: "nextjs" },
-          { label: "Express.js", value: "expressjs" },
-          { label: "Python", value: "python" },
-          { label: "Django", value: "django" },
-          { label: "Flask", value: "flask" },
-          { label: "FastAPI", value: "fastapi" },
-          { label: "Java", value: "java" },
-          { label: "Kotlin", value: "kotlin" },
-          { label: "Swift", value: "swift" },
-          { label: "Firebase", value: "firebase" },
-          { label: "MongoDB", value: "mongodb" },
-          { label: "MySQL", value: "mysql" },
-          { label: "PostgreSQL", value: "postgresql" },
-          { label: "GraphQL", value: "graphql" },
-          { label: "Tailwind CSS", value: "tailwind" },
-          { label: "Sass", value: "sass" },
-          { label: "Docker", value: "docker" },
-          { label: "Kubernetes", value: "kubernetes" },
-          { label: "AWS", value: "aws" },
-          { label: "Git", value: "git" }
-        ]
-        ,
+const StatCard = ({
+  title,
+  value,
+  icon: Icon,
+  trend,
+  color = '#007bff',
+  onPress
+}: {
+  title: string,
+  value: string,
+  icon?: any,
+  trend?: string,
+  color?: string,
+  onPress?: () => void
+}) => (
+  <TouchableOpacity
+    style={[styles.statCard, onPress && styles.clickableCard]}
+    onPress={onPress}
+    disabled={!onPress}
+  >
+    <View style={styles.statCardHeader}>
+      <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
+        {Icon && <Icon size={20} color={color} />}
+      </View>
+      {trend && (
+        <View style={[styles.trendContainer, { backgroundColor: trend.startsWith('+') ? '#10B98115' : '#EF444415' }]}>
+          <Text style={[styles.trendText, { color: trend.startsWith('+') ? '#10B981' : '#EF4444' }]}>
+            {trend}
+          </Text>
+        </View>
+      )}
+    </View>
+    <Text style={styles.statValue}>{value}</Text>
+    <Text style={styles.statTitle}>{title}</Text>
+  </TouchableOpacity>
+);
 
+const QuickActionCard = ({
+  title,
+  subtitle,
+  icon: Icon,
+  color,
+  onPress
+}: {
+  title: string,
+  subtitle: string,
+  icon: any,
+  color: string,
+  onPress: () => void
+}) => (
+  <TouchableOpacity style={styles.quickActionCard} onPress={onPress}>
+    <View style={[styles.quickActionIcon, { backgroundColor: color }]}>
+      <Icon size={24} color="white" />
+    </View>
+    <View style={styles.quickActionContent}>
+      <Text style={styles.quickActionTitle}>{title}</Text>
+      <Text style={styles.quickActionSubtitle}>{subtitle}</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+export default function DashboardScreen() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+
+  // const { user } = useAuth(); // Get current user
+
+  const user = {
+    name:'sai',
+    role:'SERVICE_AGENT'
+  }
+  
+  const navigation = useNavigation();
+
+  // Sample data for charts - replace with real data
+  const pieChartData = [
+    { name: 'Active Orders', population: 45, color: '#007bff' },
+    { name: 'Completed', population: 30, color: '#10B981' },
+    { name: 'Pending', population: 15, color: '#F59E0B' },
+    { name: 'Cancelled', population: 10, color: '#EF4444' }
+  ];
+
+
+
+  const lineChartData: LineChartData = {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [
+      {
+        label: 'Revenue',
+        data: [4000, 3000, 2000, 2780, 1890, 2390],
+        // color: '#4c6ef5', // optional, pick your preferred color
       },
       {
-        id: "profile_images",
-        type: "image",
-        label: "Profile Images",
-        props: { multiple: true },
-        required: true,
-        validation: {
-          min: 2
-        }
-      },
-      {
-        id: "rating",
-        type: "custom",
-        label: "Service Rating",
-        customComponent: RatingComponent,
-        required: true,
-        validation: {
-          custom: (value: number) => {
-            if (value && (value < 1 || value > 5)) {
-              return "Rating must be between 1 and 5"
-            }
-            return null
-          },
-        },
+        label: 'Orders',
+        data: [240, 139, 980, 390, 480, 380],
+        // color: '#f06595', // optional
       },
     ],
-  },
-  {
-    id: "service_area",
-    title: "Service Area",
-    fields: [
+  };
+
+
+  const barChartData: BarChartData = {
+    labels: ['Products', 'Services', 'Rentals', 'Sales'],
+    datasets: [
       {
-        id: "polygon",
-        type: "custom",
-        label: "Service Area Polygon",
-        placeholder: "Select your service area",
-        customComponent: PolygonSelector,
-        required: true,
-        validation: {
-          custom: (value: any) => {
-            if (value && (!value.coordinates || value.coordinates.length < 3)) {
-              return "Service area must have at least 3 coordinate points"
-            }
-            return null
-          },
-        },
+        label: 'Values',
+        data: [25, 15, 30, 20],
+        // color: '#22c55e', // optional color
       },
     ],
-  },
-  {
-    id: "pricing",
-    title: "Pricing & Quantity",
-    repeatable: {
-      fields: [
-        {
-          id: "item_name",
-          type: "text",
-          label: "Item Name",
-          placeholder: "Enter item name",
-          required: true,
-          validation: {
-            min: 2,
-            max: 100,
-          },
-        },
-        {
-          id: "quantity",
-          type: "text",
-          label: "Quantity",
-          placeholder: "Enter quantity",
-          required: true,
-          validation: {
-            pattern: /^\d+$/,
-            custom: (value: string) => {
-              const num = Number.parseInt(value)
-              if (isNaN(num) || num <= 0) {
-                return "Quantity must be a positive number"
-              }
-              if (num > 1000) {
-                return "Quantity cannot exceed 1000"
-              }
-              return null
-            },
-          },
-        },
-        {
-          id: "price",
-          type: "text",
-          label: "Price ($)",
-          placeholder: "Enter price",
-          required: true,
-          validation: {
-            pattern: /^\d+(\.\d{2})?$/,
-            custom: (value: string) => {
-              const num = Number.parseFloat(value)
-              if (isNaN(num) || num <= 0) {
-                return "Price must be a positive number"
-              }
-              if (num > 10000) {
-                return "Price cannot exceed $10,000"
-              }
-              return null
-            },
-          },
-        },
-        {
-          id: "item_images",
-          type: "image",
-          label: "Item Images",
-          props: { multiple: true },
-        },
-      ],
-      minItems: 1,
-      maxItems: 5,
-    },
-  },
-]
+  };
 
-export default function App() {
-  const handleSubmit = async (values: any) => {
-    console.log("Form submitted with values:", JSON.stringify(values, null, 2))
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShadowVisible: false,
+      headerTitle: () => (
+        <View style={styles.headerContainer}>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>
+              {user?.role === UserRole.SUPER_ADMIN ? 'ADMIN DASHBOARD' :
+                user?.role === UserRole.FRANCHISE_OWNER ? 'FRANCHISE DASHBOARD' :
+                  'SERVICE DASHBOARD'}
+            </Text>
+            <TouchableOpacity
+              onPress={openDateRangeSheet}
+              style={styles.headerDateContainer}
+            >
+              <Text style={styles.headerDateText}>
+                {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
+              </Text>
+              <Edit3 size={16} color="#007bff" style={styles.headerDateIcon} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      ),
+      headerTitleAlign: 'left',
+    });
+  }, [navigation, startDate, endDate, user?.role]);
 
-    // Simulate random success/failure for demo
-    if (Math.random() > 0.3) {
-      console.log("✅ Form submission successful!")
-    } else {
-      throw new Error("Simulated server error")
+  const handleDateRangeSelect = (newStartDate: Date, newEndDate: Date) => {
+    setStartDate(newStartDate);
+    setEndDate(newEndDate);
+  };
+
+  const openDateRangeSheet = () => {
+    SheetManager.show('date-range-sheet', {
+      payload: {
+        onDateRangeSelect: handleDateRangeSelect,
+      },
+    });
+  };
+
+  // Get tabs based on user role
+  const getTabs = () => {
+    switch (user?.role) {
+      case UserRole.SUPER_ADMIN:
+        return [
+          { key: 'overview', title: 'Overview', icon: Activity },
+          { key: 'finance', title: 'Finance', icon: DollarSign },
+          { key: 'operations', title: 'Operations', icon: Package },
+          { key: 'analytics', title: 'Analytics', icon: TrendingUp }
+        ];
+      case UserRole.FRANCHISE_OWNER:
+        return [
+          { key: 'overview', title: 'Overview', icon: Activity },
+          { key: 'orders', title: 'Orders', icon: Package },
+          { key: 'customers', title: 'Customers', icon: Users },
+          { key: 'performance', title: 'Performance', icon: TrendingUp }
+        ];
+      case UserRole.SERVICE_AGENT:
+        return [
+          { key: 'overview', title: 'Overview', icon: Activity },
+          { key: 'tasks', title: 'My Tasks', icon: Wrench },
+          { key: 'schedule', title: 'Schedule', icon: Calendar }
+        ];
+      default:
+        return [{ key: 'overview', title: 'Overview', icon: Activity }];
     }
-  }
+  };
 
-  const handleSuccess = (values: any) => {
-    console.log("🎉 Form submission successful:", values)
-  }
+  // Render content based on user role and active tab
+  const renderDashboardContent = () => {
+    const userRole = user?.role;
 
-  const handleError = (error: Error) => {
-    console.error("❌ Form submission failed:", error.message)
-  }
+    if (userRole === UserRole.SUPER_ADMIN) {
+      return renderAdminContent();
+    } else if (userRole === UserRole.FRANCHISE_OWNER) {
+      return renderFranchiseContent();
+    } else if (userRole === UserRole.SERVICE_AGENT) {
+      return renderServiceAgentContent();
+    }
+
+    return <Text>Access Denied</Text>;
+  };
+
+  const renderAdminContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <View style={styles.contentContainer}>
+            {/* Key Metrics */}
+            <View style={styles.statsGrid}>
+              <StatCard
+                title="Total Revenue"
+                value="₹2.5L"
+                icon={DollarSign}
+                trend="+12.5%"
+                color="#10B981"
+                onPress={() => router.push('/finance')}
+              />
+              <StatCard
+                title="Active Franchises"
+                value="15"
+                icon={MapPin}
+                trend="+2"
+                color="#007bff"
+                onPress={() => router.push('/franchises')}
+              />
+              <StatCard
+                title="Total Orders"
+                value="342"
+                icon={Package}
+                trend="+8.3%"
+                color="#F59E0B"
+                onPress={() => router.push('/orders')}
+              />
+              <StatCard
+                title="Service Requests"
+                value="28"
+                icon={Wrench}
+                trend="-2.1%"
+                color="#EF4444"
+                onPress={() => router.push('/service-requests')}
+              />
+            </View>
+
+            {/* Charts Section */}
+            <View style={styles.chartsSection}>
+              <DistributionPieChart
+                data={pieChartData}
+                title="Order Distribution"
+                height={200}
+              />
+              <View style={styles.chartSpacing} />
+              <ComparisonLineChart
+                data={lineChartData}
+                title="Revenue & Orders Trend"
+                height={220}
+              />
+            </View>
+
+            {/* Quick Actions */}
+            <View style={styles.quickActionsSection}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <View style={styles.quickActionsGrid}>
+                <QuickActionCard
+                  title="Manage Franchises"
+                  subtitle="View & assign areas"
+                  icon={MapPin}
+                  color="#007bff"
+                  onPress={() => router.push('/manage-franchises')}
+                />
+                <QuickActionCard
+                  title="System Analytics"
+                  subtitle="Performance insights"
+                  icon={TrendingUp}
+                  color="#10B981"
+                  onPress={() => router.push('/analytics')}
+                />
+              </View>
+            </View>
+          </View>
+        );
+
+      case 'finance':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard title="Total Income" value="₹7.5L" icon={DollarSign} color="#10B981" />
+              <StatCard title="Expenses" value="₹2.5L" icon={DollarSign} color="#EF4444" />
+              <StatCard title="Net Profit" value="₹5L" icon={TrendingUp} color="#007bff" />
+              <StatCard title="Franchise Revenue" value="₹4.2L" icon={MapPin} color="#F59E0B" />
+            </View>
+            <ComparisonBarChart
+              data={barChartData}
+              title="Revenue by Category"
+              height={220}
+            />
+          </View>
+        );
+
+      case 'operations':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard title="Active Products" value="25" icon={Package} />
+              <StatCard title="Total Users" value="1,250" icon={Users} />
+              <StatCard title="Pending Services" value="45" icon={Wrench} />
+              <StatCard title="System Alerts" value="3" icon={Bell} />
+            </View>
+          </View>
+        );
+
+      case 'analytics':
+        return (
+          <View style={styles.contentContainer}>
+            <ComparisonLineChart
+              data={lineChartData}
+              title="Performance Analytics"
+              height={220}
+            />
+            <View style={styles.chartSpacing} />
+            <DistributionPieChart
+              data={pieChartData}
+              title="User Distribution"
+              height={200}
+            />
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const renderFranchiseContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard
+                title="Monthly Revenue"
+                value="₹45K"
+                icon={DollarSign}
+                trend="+15.2%"
+                color="#10B981"
+              />
+              <StatCard
+                title="Active Orders"
+                value="42"
+                icon={Package}
+                trend="+5"
+                color="#007bff"
+              />
+              <StatCard
+                title="New Customers"
+                value="15"
+                icon={Users}
+                trend="+8"
+                color="#F59E0B"
+              />
+              <StatCard
+                title="Service Tasks"
+                value="12"
+                icon={Wrench}
+                trend="-2"
+                color="#EF4444"
+              />
+            </View>
+
+            <ComparisonLineChart
+              data={lineChartData}
+              title="Franchise Performance"
+              height={220}
+            />
+
+            <View style={styles.quickActionsSection}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <View style={styles.quickActionsGrid}>
+                <QuickActionCard
+                  title="Manage Customers"
+                  subtitle="View customer list"
+                  icon={Users}
+                  color="#007bff"
+                  onPress={() => router.push({
+                    pathname: '/manage',
+                    params: { tab: 'Customers' },
+                  })}
+                />
+                <QuickActionCard
+                  title="Order Management"
+                  subtitle="Track all orders"
+                  icon={Package}
+                  color="#10B981"
+                  onPress={() => router.push('/orders')}
+                />
+              </View>
+            </View>
+          </View>
+        );
+
+      case 'orders':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard title="Total Orders" value="156" icon={Package} />
+              <StatCard title="Pending" value="23" icon={Calendar} />
+              <StatCard title="Completed" value="120" icon={Activity} />
+              <StatCard title="Cancelled" value="13" icon={Bell} />
+            </View>
+            <DistributionPieChart
+              data={pieChartData}
+              title="Order Status Distribution"
+              height={200}
+            />
+          </View>
+        );
+
+      case 'customers':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard title="Total Customers" value="89" icon={Users} />
+              <StatCard title="Active Rentals" value="34" icon={Activity} />
+              <StatCard title="New This Month" value="12" icon={TrendingUp} />
+              <StatCard title="Service Requests" value="8" icon={Wrench} />
+            </View>
+          </View>
+        );
+
+      case 'performance':
+        return (
+          <View style={styles.contentContainer}>
+            <ComparisonBarChart
+              data={barChartData}
+              title="Performance Metrics"
+              height={220}
+            />
+            <View style={styles.chartSpacing} />
+            <ComparisonLineChart
+              data={lineChartData}
+              title="Monthly Trends"
+              height={220}
+            />
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const renderServiceAgentContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard
+                title="Today's Tasks"
+                value="8"
+                icon={Wrench}
+                color="#007bff"
+              />
+              <StatCard
+                title="Completed"
+                value="5"
+                icon={Activity}
+                color="#10B981"
+              />
+              <StatCard
+                title="Pending"
+                value="3"
+                icon={Calendar}
+                color="#F59E0B"
+              />
+              <StatCard
+                title="This Week"
+                value="32"
+                icon={TrendingUp}
+                color="#8B5CF6"
+              />
+            </View>
+
+            <View style={styles.quickActionsSection}>
+              <Text style={styles.sectionTitle}>Quick Actions</Text>
+              <View style={styles.quickActionsGrid}>
+                <QuickActionCard
+                  title="View Tasks"
+                  subtitle="Check assigned work"
+                  icon={Wrench}
+                  color="#007bff"
+                  onPress={() => router.push('/service-tasks')}
+                />
+                <QuickActionCard
+                  title="Update Status"
+                  subtitle="Mark task complete"
+                  icon={Activity}
+                  color="#10B981"
+                  onPress={() => router.push('/update-status')}
+                />
+              </View>
+            </View>
+          </View>
+        );
+
+      case 'tasks':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard title="All Tasks" value="45" icon={Wrench} />
+              <StatCard title="In Progress" value="8" icon={Activity} />
+              <StatCard title="Overdue" value="2" icon={Bell} />
+              <StatCard title="Completed" value="35" icon={TrendingUp} />
+            </View>
+          </View>
+        );
+
+      case 'schedule':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.statsGrid}>
+              <StatCard title="Today" value="8" icon={Calendar} />
+              <StatCard title="Tomorrow" value="6" icon={Calendar} />
+              <StatCard title="This Week" value="32" icon={Calendar} />
+              <StatCard title="Available Slots" value="12" icon={Activity} />
+            </View>
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const tabs = getTabs();
 
   return (
+    <View style={styles.container}>
+      {/* Dashboard Tabs */}
+      <View style={styles.tabContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabScrollContent}
+        >
+          {tabs.map((tab) => (
+            <DashboardTab
+              key={tab.key}
+              title={tab.title}
+              icon={tab.icon}
+              active={activeTab === tab.key}
+              onPress={() => setActiveTab(tab.key)}
+            />
+          ))}
+        </ScrollView>
+      </View>
 
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-        <DynamicForm
-          sections={formSections}
-          onSubmit={handleSubmit}
-          onSuccess={handleSuccess}
-          onError={handleError}
-          submitButtonText="Create Profile"
-          initialValues={{
-            basic_info: {
-              name: 'sai'
-            }
-          }}
-        />
-      </SafeAreaView>
-    </SafeAreaProvider>
-
-  )
+      {/* Dashboard Content */}
+      <ScrollView
+        style={styles.dashboardContent}
+        contentContainerStyle={styles.dashboardContentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {renderDashboardContent()}
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: '#f8fafc',
   },
-})
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flex: 1,
+  },
+  headerTitle: {
+    color: '#111618',
+    fontSize: 20,
+    fontFamily: 'Outfit_700Bold',
+    flex: 1,
+  },
+  headerDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginLeft: 10,
+  },
+  headerDateText: {
+    fontSize: 12,
+    color: '#475569',
+    marginRight: 4,
+    fontFamily: 'Outfit_500Medium',
+  },
+  headerDateIcon: {
+    marginLeft: 4,
+  },
+  tabContainer: {
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e2e8f0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  tabScrollContent: {
+    paddingHorizontal: 16,
+  },
+  tab: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginRight: 8,
+  },
+  activeTab: {
+    borderBottomWidth: 3,
+    borderBottomColor: '#007bff',
+  },
+  tabContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tabIcon: {
+    marginRight: 6,
+  },
+  tabText: {
+    color: '#64748b',
+    fontFamily: 'Outfit_500Medium',
+    fontSize: 14,
+  },
+  activeTabText: {
+    color: '#007bff',
+    fontFamily: 'Outfit_700Bold',
+  },
+  dashboardContent: {
+    flex: 1,
+  },
+  dashboardContentContainer: {
+    padding: 16,
+  },
+  contentContainer: {
+    flex: 1,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  statCard: {
+    width: (screenWidth - 48) / 2,
+    backgroundColor: 'white',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  clickableCard: {
+    transform: [{ scale: 1 }],
+  },
+  statCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trendContainer: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  trendText: {
+    fontSize: 12,
+    fontFamily: 'Outfit_600SemiBold',
+  },
+  statValue: {
+    fontSize: 24,
+    fontFamily: 'Outfit_700Bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  statTitle: {
+    fontSize: 14,
+    color: '#64748b',
+    fontFamily: 'Outfit_500Medium',
+  },
+  chartsSection: {
+    marginBottom: 24,
+  },
+  chartSpacing: {
+    height: 20,
+  },
+  quickActionsSection: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Outfit_700Bold',
+    color: '#1e293b',
+    marginBottom: 16,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickActionCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 16,
+    marginHorizontal: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  quickActionContent: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    fontSize: 14,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  quickActionSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    fontFamily: 'Outfit_400Regular',
+  },
+});

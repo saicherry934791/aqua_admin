@@ -1,0 +1,219 @@
+import { apiService } from "@/lib/api/api"
+import { useNavigation, useRoute } from "@react-navigation/native"
+import React, { useEffect, useState } from "react"
+import { Alert, StatusBar, Text } from "react-native"
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
+import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
+
+interface Franchise {
+    id: string
+    name: string
+}
+
+const AgentFormScreen = () => {
+    const route = useRoute()
+    const navigation = useNavigation()
+    const { id } = route.params || {}
+
+    const isNew = id === "new"
+    const [initialValues, setInitialValues] = useState({})
+    const [loading, setLoading] = useState(true)
+    const [franchises, setFranchises] = useState<Franchise[]>([])
+
+    useEffect(() => {
+        fetchFranchises()
+        if (!isNew) {
+            fetchAgentData()
+        } else {
+            setLoading(false)
+        }
+    }, [id])
+
+    const fetchFranchises = async () => {
+        try {
+            const response = await apiService.get("/franchises")
+            if (response.success && response.data) {
+                setFranchises(response.data)
+            }
+        } catch (error) {
+            console.error("Failed to fetch franchises:", error)
+            Alert.alert("Error", "Failed to load franchise data")
+        }
+    }
+
+    const fetchAgentData = async () => {
+        try {
+            const response = await apiService.get(`/agents/${id}`)
+            if (response.success && response.data) {
+                const data = response.data
+                setInitialValues({
+                    agent_info: {
+                        agentName: data.agentName || "",
+                        phoneNumber: data.phoneNumber || "",
+                        email: data.email || "",
+                        address: data.address || "",
+                        alternativePhone: data.alternativePhone || "",
+                        franchiseAreaId: data.franchiseAreaId?.toString() || "",
+                    },
+                })
+            }
+        } catch (error) {
+            console.error("Failed to fetch agent data:", error)
+            Alert.alert("Error", "Failed to load agent data")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleSubmit = async (values: any) => {
+        try {
+            const payload = {
+                name: values.agent_info.agentName,
+                number: values.agent_info.phoneNumber,
+                email: values.agent_info.email || null,
+                address: values.agent_info.address || null,
+                alternativeNumber: values.agent_info.alternativePhone || null,
+                franchiseId: values.agent_info.franchiseAreaId || null,
+            }
+
+            const endpoint = isNew ? "/agents" : `/agents/${id}`
+            const method = isNew ? "post" : "put"
+
+            const response = await apiService[method](endpoint, payload)
+            
+            if (!response.success) {
+                throw new Error(response.message || "Failed to save agent")
+            }
+
+            Alert.alert("Success", `Agent ${isNew ? "created" : "updated"} successfully`)
+            navigation.goBack()
+
+        } catch (error) {
+            console.error("Submit Error:", error)
+            Alert.alert("Error", "Failed to submit the form")
+        }
+    }
+
+    const franchiseOptions = franchises.map(franchise => ({
+        label: franchise.name,
+        value: franchise.id.toString()
+    }))
+
+    const formSections: FormSection[] = [
+        {
+            id: "agent_info",
+            title: "Agent Details",
+            fields: [
+                {
+                    id: "agentName",
+                    type: "text",
+                    label: "Agent Name",
+                    placeholder: "Enter agent name",
+                    required: true,
+                    validation: {
+                        min: 2,
+                        max: 100,
+                    },
+                },
+                {
+                    id: "phoneNumber",
+                    type: "text",
+                    label: "Phone Number",
+                    placeholder: "Enter phone number",
+                    required: true,
+                    validation: {
+                        pattern: /^[0-9+\-\s()]+$/,
+                        custom: (value: string) => {
+                            const cleanedValue = value.replace(/[^\d]/g, "")
+                            if (cleanedValue.length < 10) {
+                                return "Phone number must be at least 10 digits"
+                            }
+                            return null
+                        },
+                    },
+                },
+                {
+                    id: "email",
+                    type: "text",
+                    label: "Email (Optional)",
+                    placeholder: "Enter email address",
+                    required: false,
+                    validation: {
+                        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                        custom: (value: string) => {
+                            if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                                return "Please enter a valid email address"
+                            }
+                            return null
+                        },
+                    },
+                },
+                {
+                    id: "address",
+                    type: "textarea",
+                    label: "Address (Optional)",
+                    placeholder: "Enter agent address",
+                    required: false,
+                    props: {
+                        rows: 3,
+                    },
+                    validation: {
+                        max: 500,
+                    },
+                },
+                {
+                    id: "alternativePhone",
+                    type: "text",
+                    label: "Alternative Phone (Optional)",
+                    placeholder: "Enter alternative phone number",
+                    required: false,
+                    validation: {
+                        pattern: /^[0-9+\-\s()]*$/,
+                        custom: (value: string) => {
+                            if (value) {
+                                const cleanedValue = value.replace(/[^\d]/g, "")
+                                if (cleanedValue.length > 0 && cleanedValue.length < 10) {
+                                    return "Alternative phone must be at least 10 digits"
+                                }
+                            }
+                            return null
+                        },
+                    },
+                },
+                {
+                    id: "franchiseAreaId",
+                    type: "select",
+                    label: "Franchise Area (Optional)",
+                    placeholder: "Select franchise area or leave empty for global agent",
+                    required: false,
+                    options: [
+                        { label: "Global Agent (No specific area)", value: "" },
+                        ...franchiseOptions
+                    ],
+                },
+            ],
+        },
+    ]
+
+    if (loading) {
+        return (
+            <SafeAreaProvider>
+                <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                    <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+                    <Text style={{ textAlign: "center", fontSize: 16 }}>Loading...</Text>
+                </SafeAreaView>
+            </SafeAreaProvider>
+        )
+    }
+
+    return (
+        <DynamicForm
+            sections={formSections}
+            onSubmit={handleSubmit}
+            submitButtonText={isNew ? "Create Agent" : "Update Agent"}
+            initialValues={initialValues}
+        />
+    )
+}
+
+export default AgentFormScreen
