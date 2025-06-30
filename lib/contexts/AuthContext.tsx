@@ -3,10 +3,8 @@ import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import {
     getAuth,
     signInWithPhoneNumber,
-    connectAuthEmulator,
     signOut
 } from '@react-native-firebase/auth';
-import { getApp } from '@react-native-firebase/app';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { apiService } from '../api/api';
 
@@ -53,7 +51,7 @@ interface AuthContextType {
 
     // Auth methods
     sendOTP: (phoneNumber: string, customerType: CustomerType) => Promise<FirebaseAuthTypes.ConfirmationResult>;
-    verifyOTP: (otp: string) => Promise<boolean>;
+    verifyOTP: (otp: string, role: string) => Promise<boolean>;
     logout: () => Promise<void>;
 
     // View As functionality
@@ -133,24 +131,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('=== Starting OTP Process ===');
             console.log('Phone number:', phoneNumber);
             console.log('Customer type:', customerType);
-            console.log('Is emulator?', __DEV__);
 
-            const formattedPhone = '+91' + phoneNumber.replace(/\D/g, ''); // Remove non-digits
+            const formattedPhone = '+91' + phoneNumber.replace(/\D/g, '');
             console.log('Formatted phone:', formattedPhone);
 
-            console.log('Calling signInWithPhoneNumber...');
-
-            // Add timeout to prevent hanging
-            const confirmation = await Promise.race([
-                await signInWithPhoneNumber(getAuth(), formattedPhone),
-                new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
-                )
-            ]);
+            const confirmation = await signInWithPhoneNumber(getAuth(), formattedPhone);
 
             console.log('=== OTP Sent Successfully ===');
-            console.log('Confirmation received ', confirmation);
-            setConfirmation(confirmation)
+            setConfirmation(confirmation);
             return confirmation;
         } catch (error) {
             console.log('=== OTP Error ===');
@@ -159,29 +147,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    const verifyOTP = async (otp: string): Promise<boolean> => {
+    const verifyOTP = async (otp: string, role: string): Promise<boolean> => {
         try {
             setIsLoading(true);
             if (!confirmation) {
-                return false
+                throw new Error('No OTP confirmation found. Please request a new OTP.');
             }
 
-            // Verify OTP with React Native Firebase
+            // Verify OTP with Firebase
             const result = await confirmation.confirm(otp);
-
-            console.log('result is ', result)
             const idToken = await result.user.getIdToken();
 
-            console.log('idToken is ', idToken)
+            console.log('Firebase verification successful, sending to backend...');
 
-            // Send idToken to backend for authentication
+            // Send idToken and role to backend for authentication
             const response = await apiService.post('/auth/login', {
                 idToken,
-                phoneNumber: result.user.phoneNumber,
-                customerType: CustomerType, // Make sure to pass the actual customerType parameter
+                role, // Send the role that was selected during login
             });
 
-            console.log('response is ', response)
+            console.log('Backend login response:', response);
 
             if (response.success) {
                 const { accessToken, refreshToken, user: userData } = response.data;
@@ -194,13 +179,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 ]);
 
                 setUser(userData);
+                setConfirmation(null); // Clear confirmation after successful verification
                 return true;
+            } else {
+                throw new Error(response.error || 'Login failed');
             }
-
-            return false;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Verify OTP error:', error);
-            return false;
+            
+            // Clear confirmation on error so user can try again
+            setConfirmation(null);
+            
+            // Re-throw with a user-friendly message
+            if (error.code === 'auth/invalid-verification-code') {
+                throw new Error('Invalid OTP. Please check the code and try again.');
+            } else if (error.code === 'auth/code-expired') {
+                throw new Error('OTP has expired. Please request a new code.');
+            } else {
+                throw new Error(error.message || 'OTP verification failed. Please try again.');
+            }
         } finally {
             setIsLoading(false);
         }
@@ -210,7 +207,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
             setIsLoading(true);
 
-            // Sign out from React Native Firebase using modular SDK
+            // Sign out from Firebase
             await signOut(getAuth());
 
             // Clear local storage
@@ -218,6 +215,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             // Reset state
             setUser(null);
+            setConfirmation(null);
             setViewAsState({
                 isViewingAs: false,
                 originalUser: null,
@@ -388,7 +386,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setUser(response.data);
                 await AsyncStorage.setItem('userProfile', JSON.stringify(response.data));
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Refresh user error:', error);
             // If token is invalid, clear auth data
             if (error?.response?.status === 401) {

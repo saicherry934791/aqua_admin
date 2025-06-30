@@ -1,5 +1,5 @@
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { router, useNavigation } from 'expo-router';
+import { router, useNavigation, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
     Alert,
@@ -11,9 +11,10 @@ import {
     View,
 } from 'react-native';
 
-const otp = () => {
+const OTPScreen = () => {
     const navigation = useNavigation();
     const { verifyOTP } = useAuth();
+    const { role, phoneNumber, userId } = useLocalSearchParams();
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -26,15 +27,29 @@ const otp = () => {
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [isComplete, setIsComplete] = useState(false);
     const [loading, setLoading] = useState(false);
-    const inputRefs = useRef([]);
+    const [resendLoading, setResendLoading] = useState(false);
+    const [resendTimer, setResendTimer] = useState(30);
+    const inputRefs = useRef<(TextInput | null)[]>([]);
 
     useEffect(() => {
         const otpString = otp.join('');
         setIsComplete(otpString.length === 6 && /^\d{6}$/.test(otpString));
     }, [otp]);
 
-    const handleOtpChange = (value, index) => {
+    // Resend timer
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (resendTimer > 0) {
+            interval = setInterval(() => {
+                setResendTimer(prev => prev - 1);
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [resendTimer]);
+
+    const handleOtpChange = (value: string, index: number) => {
         if (value.length > 1 && index === 0) {
+            // Handle paste
             const pastedCode = value.replace(/[^0-9]/g, '').slice(0, 6);
             const newOtp = Array(6).fill('');
             for (let i = 0; i < Math.min(pastedCode.length, 6); i++) {
@@ -59,7 +74,7 @@ const otp = () => {
         }
     };
 
-    const handleKeyPress = (key, index) => {
+    const handleKeyPress = (key: string, index: number) => {
         if (key === 'Backspace') {
             if (otp[index] === '' && index > 0) {
                 const newOtp = [...otp];
@@ -79,23 +94,46 @@ const otp = () => {
         if (isComplete) {
             setLoading(true);
             try {
-                await verifyOTP(otpString);
-                router.replace('/(tabs)');
-            } catch (e) {
-                Alert.alert('Error', e.message || 'OTP verification failed');
+                const success = await verifyOTP(otpString, role as string);
+                if (success) {
+                    router.replace('/(tabs)');
+                } else {
+                    Alert.alert('Invalid OTP', 'The OTP you entered is incorrect. Please try again.');
+                    // Clear OTP on failure
+                    setOtp(['', '', '', '', '', '']);
+                    inputRefs.current[0]?.focus();
+                }
+            } catch (error: any) {
+                console.error('OTP verification error:', error);
+                Alert.alert('Error', error.message || 'OTP verification failed. Please try again.');
+                // Clear OTP on error
+                setOtp(['', '', '', '', '', '']);
+                inputRefs.current[0]?.focus();
             } finally {
                 setLoading(false);
             }
         }
     };
 
-    const handleResendOTP = () => {
-        Alert.alert('OTP Resent', 'A new OTP has been sent to your phone number.');
-        setOtp(['', '', '', '', '', '']);
-        inputRefs.current[0]?.focus();
+    const handleResendOTP = async () => {
+        if (resendTimer > 0) return;
+        
+        setResendLoading(true);
+        try {
+            // You would call your resend OTP API here
+            // For now, we'll just reset the timer
+            setResendTimer(30);
+            Alert.alert('OTP Resent', 'A new OTP has been sent to your phone number.');
+            setOtp(['', '', '', '', '', '']);
+            inputRefs.current[0]?.focus();
+        } catch (error) {
+            Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+        } finally {
+            setResendLoading(false);
+        }
     };
 
-    const renderOtpInput = (index) => (
+    const renderOtpInput = (index: number) => (
         <TextInput
             key={index}
             ref={(ref) => (inputRefs.current[index] = ref)}
@@ -120,7 +158,7 @@ const otp = () => {
         <View style={styles.container}>
             <Text style={styles.title}>Enter the code</Text>
             <Text style={styles.description}>
-                We sent a verification code to your phone number. Please enter it below.
+                We sent a verification code to +91 {phoneNumber}. Please enter it below.
             </Text>
 
             <View style={styles.otpContainer}>
@@ -147,10 +185,19 @@ const otp = () => {
 
             <TouchableOpacity
                 onPress={handleResendOTP}
-                style={styles.resendContainer}
-                disabled={loading}
+                style={[
+                    styles.resendContainer,
+                    (resendTimer > 0 || resendLoading) && { opacity: 0.6 }
+                ]}
+                disabled={resendTimer > 0 || resendLoading || loading}
             >
-                <Text style={styles.resendText}>Resend OTP</Text>
+                {resendLoading ? (
+                    <ActivityIndicator size="small" color="#607e8a" />
+                ) : (
+                    <Text style={styles.resendText}>
+                        {resendTimer > 0 ? `Resend OTP (${resendTimer}s)` : 'Resend OTP'}
+                    </Text>
+                )}
             </TouchableOpacity>
         </View>
     );
@@ -232,6 +279,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: 12,
         paddingTop: 4,
+        minHeight: 40,
+        justifyContent: 'center',
     },
     resendText: {
         color: '#607e8a',
@@ -249,4 +298,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default otp;
+export default OTPScreen;

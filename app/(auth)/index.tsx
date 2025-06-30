@@ -8,7 +8,8 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    Alert
 } from 'react-native';
 
 const Login = () => {
@@ -32,25 +33,49 @@ const Login = () => {
     };
 
     const handleSendOTP = async () => {
-        if (!isValidPhoneNumber(phoneNumber)) return;
+        if (!isValidPhoneNumber(phoneNumber)) {
+            Alert.alert('Invalid Phone Number', 'Please enter a valid 10-digit phone number');
+            return;
+        }
 
         setIsLoading(true);
         try {
-            const result = await apiService.get<{ role: string }>(
-                `/auth/checkrole?phoneNumber=${phoneNumber}`
+            // First check if user exists with the selected role
+            const result = await apiService.get(
+                `/auth/checkrole?phoneNumber=${phoneNumber}&role=${selectedRole}`
             );
 
-            console.log('result is ', result);
+            console.log('Role check result:', result);
 
-            if (result.success && result.data.role === selectedRole) {
-                const confirmation: any = await sendOTP(phoneNumber, selectedRole as CustomerType);
-                console.log('confirmation is ', confirmation);
-                navigation.navigate('otp', { role: selectedRole });
+            if (result.success) {
+                if (result.data.exists && result.data.role === selectedRole) {
+                    // User exists with correct role, proceed with OTP
+                    const confirmation = await sendOTP(phoneNumber, selectedRole as CustomerType);
+                    console.log('OTP sent successfully:', confirmation);
+                    navigation.navigate('otp' as never, { 
+                        role: selectedRole,
+                        phoneNumber: phoneNumber,
+                        userId: result.data.userId 
+                    } as never);
+                } else if (result.data.exists && result.data.role !== selectedRole) {
+                    // User exists but with different role
+                    Alert.alert(
+                        'Role Mismatch', 
+                        `This phone number is registered as ${result.data.role}. Please select the correct role or contact support.`
+                    );
+                } else {
+                    // User doesn't exist
+                    Alert.alert(
+                        'User Not Found', 
+                        'No account found with this phone number and role. Please contact your administrator to create an account.'
+                    );
+                }
             } else {
-                // Handle mismatch role or other validation here
+                Alert.alert('Error', result.error || 'Failed to verify user. Please try again.');
             }
         } catch (error) {
             console.error('Failed to send OTP:', error);
+            Alert.alert('Error', 'Failed to send OTP. Please check your connection and try again.');
         } finally {
             setIsLoading(false);
         }
@@ -82,6 +107,7 @@ const Login = () => {
                         onChangeText={handlePhoneNumberChange}
                         keyboardType="numeric"
                         maxLength={10}
+                        editable={!isLoading}
                     />
                 </View>
             </View>
@@ -97,6 +123,7 @@ const Login = () => {
                                 selectedRole === role && styles.activeRoleTab
                             ]}
                             onPress={() => setSelectedRole(role)}
+                            disabled={isLoading}
                         >
                             <Text
                                 style={[
