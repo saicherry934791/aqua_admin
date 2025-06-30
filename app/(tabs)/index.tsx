@@ -1,6 +1,6 @@
 import { Button } from '@react-navigation/elements';
 import { router, useNavigation } from 'expo-router';
-import { LocationEdit as Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity } from 'lucide-react-native';
+import { Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity } from 'lucide-react-native';
 import React, { useContext, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -147,7 +147,7 @@ export default function DashboardScreen() {
         <View style={styles.headerContainer}>
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>
-              {user?.role === UserRole.SUPER_ADMIN ? 'ADMIN DASHBOARD' :
+              {user?.role === UserRole.ADMIN ? 'ADMIN DASHBOARD' :
                 user?.role === UserRole.FRANCHISE_OWNER ? 'FRANCHISE DASHBOARD' :
                   'SERVICE DASHBOARD'}
             </Text>
@@ -183,7 +183,7 @@ export default function DashboardScreen() {
   // Get tabs based on user role
   const getTabs = () => {
     switch (user?.role) {
-      case UserRole.SUPER_ADMIN:
+      case UserRole.ADMIN:
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
           { key: 'finance', title: 'Finance', icon: DollarSign },
@@ -212,7 +212,7 @@ export default function DashboardScreen() {
   const renderDashboardContent = () => {
     const userRole = user?.role;
 
-    if (userRole === UserRole.SUPER_ADMIN) {
+    if (userRole === UserRole.ADMIN) {
       return renderAdminContent();
     } else if (userRole === UserRole.FRANCHISE_OWNER) {
       return renderFranchiseContent();
@@ -244,7 +244,10 @@ export default function DashboardScreen() {
                 icon={MapPin}
                 trend="+2"
                 color="#007bff"
-                onPress={() => router.push('/franchises')}
+                onPress={() => router.push({
+                  pathname: '/manage',
+                  params: { tab: 'Franchises' },
+                })}
               />
               <StatCard
                 title="Total Orders"
@@ -260,7 +263,7 @@ export default function DashboardScreen() {
                 icon={Wrench}
                 trend="-2.1%"
                 color="#EF4444"
-                onPress={() => router.push('/service-requests')}
+                onPress={() => router.push('/service')}
               />
             </View>
 

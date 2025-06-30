@@ -9,15 +9,17 @@ import React, { createContext, ReactNode, useContext, useEffect, useState } from
 import { apiService } from '../api/api';
 
 export enum UserRole {
-    SUPER_ADMIN = 'admin',
-    FRANCHISE_OWNER = 'Franchise',
-    SERVICE_AGENT = 'Agent',
+    CUSTOMER = 'customer',
+    ADMIN = 'admin',
+    FRANCHISE_OWNER = 'franchise_owner',
+    SERVICE_AGENT = 'service_agent',
 }
 
 export enum CustomerType {
+    CUSTOMER = 'customer',
     ADMIN = 'admin',
-    FRANCHISE = 'Franchise',
-    AGENT = 'Agent',
+    FRANCHISE = 'franchise_owner',
+    AGENT = 'service_agent',
 }
 
 export interface User {
@@ -238,7 +240,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const viewAsFranchiseOwner = async (franchiseId: string): Promise<boolean> => {
-        if (!user || user.role !== UserRole.SUPER_ADMIN) {
+        if (!user || user.role !== UserRole.ADMIN) {
             return false;
         }
 
@@ -276,7 +278,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     const viewAsServiceAgent = async (agentId: string, franchiseId: string): Promise<boolean> => {
-        if (!user || (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.FRANCHISE_OWNER)) {
+        if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.FRANCHISE_OWNER)) {
             return false;
         }
 
@@ -349,13 +351,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Define screen permissions based on roles
         const screenPermissions: Record<string, UserRole[]> = {
-            'super-admin-dashboard': [UserRole.SUPER_ADMIN],
-            'franchise-dashboard': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER],
-            'agent-dashboard': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT],
-            'franchise-management': [UserRole.SUPER_ADMIN],
-            'user-management': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER],
-            'service-requests': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT],
-            'reports': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER],
+            'super-admin-dashboard': [UserRole.ADMIN],
+            'franchise-dashboard': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER],
+            'agent-dashboard': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT],
+            'franchise-management': [UserRole.ADMIN],
+            'user-management': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER],
+            'service-requests': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT],
+            'reports': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER],
         };
 
         const allowedRoles = screenPermissions[screenName];
@@ -367,12 +369,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Define tab access based on roles
         const tabPermissions: Record<string, UserRole[]> = {
-            'index': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Dashboard
-            'manage': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER], // Manage tab
-            'orders': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Orders
-            'service': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Service requests
+            'index': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Dashboard
+            'manage': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER], // Manage tab
+            'orders': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Orders
+            'service': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Service requests
             'notifications': [UserRole.SERVICE_AGENT], // Notifications (Service agents only)
-            'profile': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Profile
+            'profile': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Profile
         };
 
         const allowedRoles = tabPermissions[tabName];

@@ -22,7 +22,7 @@ const Manage = () => {
         if (!user) return 'Products';
         
         switch (user.role) {
-            case UserRole.SUPER_ADMIN:
+            case UserRole.ADMIN:
                 return 'Products';
             case UserRole.FRANCHISE_OWNER:
                 return 'Agents';
@@ -35,10 +35,10 @@ const Manage = () => {
         if (!user) return [];
 
         const allTabs = [
-            { name: 'Products', component: ProductsScreen, roles: [UserRole.SUPER_ADMIN] },
-            { name: 'Franchises', component: FranchiseScreen, roles: [UserRole.SUPER_ADMIN] },
-            { name: 'Agents', component: AgentsScreen, roles: [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER] },
-            { name: 'Customers', component: CustomersScreen, roles: [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER] },
+            { name: 'Products', component: ProductsScreen, roles: [UserRole.ADMIN] },
+            { name: 'Franchises', component: FranchiseScreen, roles: [UserRole.ADMIN] },
+            { name: 'Agents', component: AgentsScreen, roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER] },
+            { name: 'Customers', component: CustomersScreen, roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER] },
         ];
 
         return allTabs.filter(tab => tab.roles.includes(user.role));

@@ -115,7 +115,7 @@ const Login = () => {
             <View style={styles.roleSection}>
                 <Text style={styles.roleLabel}>Select Role</Text>
                 <View style={styles.roleSelectorContainer}>
-                    {['admin', 'Franchise', 'Agent'].map((role) => (
+                    {['admin', 'franchise_owner', 'service_agent'].map((role) => (
                         <TouchableOpacity
                             key={role}
                             style={[
@@ -131,7 +131,8 @@ const Login = () => {
                                     selectedRole === role && styles.activeRoleTabText
                                 ]}
                             >
-                                {role}
+                                {role === 'admin' ? 'Admin' : 
+                                 role === 'franchise_owner' ? 'Franchise' : 'Agent'}
                             </Text>
                         </TouchableOpacity>
                     ))}
