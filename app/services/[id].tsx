@@ -1,8 +1,7 @@
-// screens/ServiceDetailScreen.tsx
 import { apiService } from '@/lib/api/api';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
     ScrollView,
     StyleSheet,
@@ -51,6 +50,7 @@ const ServiceDetailScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const actionSheetRef = useRef<ActionSheet>(null);
 
     // Mock data for demonstration
     const mockServiceRequest: ServiceRequest = {
@@ -200,87 +200,88 @@ const ServiceDetailScreen = () => {
     };
 
     const showActionSheet = () => {
-        if (!serviceRequest) return;
+        actionSheetRef.current?.show();
+    };
 
-        const currentStatus = serviceRequest.status;
-        let options = ['Cancel'];
-        let destructiveButtonIndex = -1;
-
-        // Define available actions based on current status
-        switch (currentStatus) {
-            case 'CREATED':
-                options = ['Assign to Technician', 'Schedule Service', 'Cancel Request', 'Cancel'];
-                destructiveButtonIndex = 2;
+    const handleActionPress = (action: string) => {
+        actionSheetRef.current?.hide();
+        
+        switch (action) {
+            case 'assign':
+                updateServiceStatus('ASSIGNED');
                 break;
-            case 'ASSIGNED':
-                options = ['Schedule Service', 'Start Service', 'Cancel Request', 'Cancel'];
-                destructiveButtonIndex = 2;
+            case 'schedule':
+                updateServiceStatus('SCHEDULED');
                 break;
-            case 'SCHEDULED':
-                options = ['Start Service', 'Reschedule', 'Cancel Request', 'Cancel'];
-                destructiveButtonIndex = 2;
+            case 'start':
+                updateServiceStatus('IN_PROGRESS');
                 break;
-            case 'IN_PROGRESS':
-                options = ['Complete Service', 'Pause Service', 'Cancel Request', 'Cancel'];
-                destructiveButtonIndex = 2;
+            case 'complete':
+                updateServiceStatus('COMPLETED');
                 break;
-            case 'COMPLETED':
-                options = ['Reopen Service', 'Cancel'];
+            case 'pause':
+                updateServiceStatus('ASSIGNED');
                 break;
-            case 'CANCELLED':
-                options = ['Reopen Service', 'Cancel'];
+            case 'cancel':
+                Alert.alert(
+                    'Confirm Cancellation',
+                    'Are you sure you want to cancel this service request?',
+                    [
+                        { text: 'No', style: 'cancel' },
+                        { text: 'Yes', onPress: () => updateServiceStatus('CANCELLED'), style: 'destructive' }
+                    ]
+                );
+                break;
+            case 'reopen':
+                updateServiceStatus('CREATED');
+                break;
+            case 'reschedule':
+                Alert.alert('Reschedule', 'Reschedule functionality would be implemented here');
                 break;
         }
+    };
 
-        ActionSheet.showActionSheetWithOptions(
-            {
-                options,
-                destructiveButtonIndex,
-                cancelButtonIndex: options.length - 1,
-                title: 'Update Service Request',
-                message: 'Choose an action to update this service request',
-            },
-            (buttonIndex) => {
-                if (buttonIndex === options.length - 1) return; // Cancel
+    const getAvailableActions = () => {
+        if (!serviceRequest) return [];
 
-                const selectedOption = options[buttonIndex];
-
-                switch (selectedOption) {
-                    case 'Assign to Technician':
-                        updateServiceStatus('ASSIGNED');
-                        break;
-                    case 'Schedule Service':
-                        updateServiceStatus('SCHEDULED');
-                        break;
-                    case 'Start Service':
-                        updateServiceStatus('IN_PROGRESS');
-                        break;
-                    case 'Complete Service':
-                        updateServiceStatus('COMPLETED');
-                        break;
-                    case 'Pause Service':
-                        updateServiceStatus('ASSIGNED');
-                        break;
-                    case 'Cancel Request':
-                        Alert.alert(
-                            'Confirm Cancellation',
-                            'Are you sure you want to cancel this service request?',
-                            [
-                                { text: 'No', style: 'cancel' },
-                                { text: 'Yes', onPress: () => updateServiceStatus('CANCELLED') }
-                            ]
-                        );
-                        break;
-                    case 'Reopen Service':
-                        updateServiceStatus('CREATED');
-                        break;
-                    case 'Reschedule':
-                        // Handle reschedule logic
-                        Alert.alert('Reschedule', 'Reschedule functionality would be implemented here');
-                        break;
-                }
-            }
-        );
+        const currentStatus = serviceRequest.status;
+        
+        switch (currentStatus) {
+            case 'CREATED':
+                return [
+                    { key: 'assign', title: 'Assign to Technician', icon: 'person-add' },
+                    { key: 'schedule', title: 'Schedule Service', icon: 'calendar' },
+                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                ];
+            case 'ASSIGNED':
+                return [
+                    { key: 'schedule', title: 'Schedule Service', icon: 'calendar' },
+                    { key: 'start', title: 'Start Service', icon: 'play' },
+                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                ];
+            case 'SCHEDULED':
+                return [
+                    { key: 'start', title: 'Start Service', icon: 'play' },
+                    { key: 'reschedule', title: 'Reschedule', icon: 'calendar' },
+                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                ];
+            case 'IN_PROGRESS':
+                return [
+                    { key: 'complete', title: 'Complete Service', icon: 'checkmark-circle' },
+                    { key: 'pause', title: 'Pause Service', icon: 'pause' },
+                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                ];
+            case 'COMPLETED':
+                return [
+                    { key: 'reopen', title: 'Reopen Service', icon: 'refresh' },
+                ];
+            case 'CANCELLED':
+                return [
+                    { key: 'reopen', title: 'Reopen Service', icon: 'refresh' },
+                ];
+            default:
+                return [];
+        }
     };
 
     if (loading) {
@@ -307,6 +308,7 @@ const ServiceDetailScreen = () => {
 
     const statusColors = getStatusColor(serviceRequest.status);
     const priorityColors = getPriorityColor(serviceRequest.priority);
+    const availableActions = getAvailableActions();
 
     return (
         <View style={styles.container}>
@@ -537,6 +539,54 @@ const ServiceDetailScreen = () => {
                     </>
                 )}
             </TouchableOpacity>
+
+            {/* Action Sheet */}
+            <ActionSheet
+                ref={actionSheetRef}
+                containerStyle={styles.actionSheetContainer}
+                gestureEnabled={true}
+                headerAlwaysVisible={true}
+                CustomHeaderComponent={
+                    <View style={styles.actionSheetHeader}>
+                        <View style={styles.actionSheetHandle} />
+                        <Text style={styles.actionSheetTitle}>Update Service Request</Text>
+                        <Text style={styles.actionSheetSubtitle}>Choose an action to update this service request</Text>
+                    </View>
+                }
+            >
+                <View style={styles.actionSheetContent}>
+                    {availableActions.map((action, index) => (
+                        <TouchableOpacity
+                            key={action.key}
+                            style={[
+                                styles.actionSheetItem,
+                                action.destructive && styles.actionSheetItemDestructive,
+                                index === availableActions.length - 1 && styles.actionSheetItemLast
+                            ]}
+                            onPress={() => handleActionPress(action.key)}
+                        >
+                            <View style={styles.actionSheetItemContent}>
+                                <View style={[
+                                    styles.actionSheetItemIcon,
+                                    action.destructive && styles.actionSheetItemIconDestructive
+                                ]}>
+                                    <Ionicons
+                                        name={action.icon as any}
+                                        size={20}
+                                        color={action.destructive ? '#EF4444' : '#3B82F6'}
+                                    />
+                                </View>
+                                <Text style={[
+                                    styles.actionSheetItemText,
+                                    action.destructive && styles.actionSheetItemTextDestructive
+                                ]}>
+                                    {action.title}
+                                </Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </ActionSheet>
         </View>
     );
 };
@@ -544,7 +594,6 @@ const ServiceDetailScreen = () => {
 export default ServiceDetailScreen;
 
 const styles = StyleSheet.create({
-
     container: {
         flex: 1,
         backgroundColor: '#F8FAFC',
@@ -562,7 +611,6 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 16,
         fontSize: 16,
-        fontFamily: 'Outfit_500Medium',
         color: '#6B7280',
     },
     errorContainer: {
@@ -574,14 +622,13 @@ const styles = StyleSheet.create({
     },
     errorTitle: {
         fontSize: 20,
-        fontFamily: 'Outfit_600SemiBold',
         color: '#EF4444',
         marginTop: 16,
         marginBottom: 8,
+        fontWeight: '600',
     },
     errorSubtitle: {
         fontSize: 14,
-        fontFamily: 'Outfit_400Regular',
         color: '#6B7280',
         textAlign: 'center',
         marginBottom: 24,
@@ -595,7 +642,7 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#fff',
         fontSize: 14,
-        fontFamily: 'Outfit_500Medium',
+        fontWeight: '500',
     },
     headerCard: {
         backgroundColor: '#fff',
@@ -634,12 +681,12 @@ const styles = StyleSheet.create({
     },
     requestId: {
         fontSize: 20,
-        fontFamily: 'Outfit_700Bold',
+        fontWeight: '700',
         color: '#111827',
     },
     serviceTypeText: {
         fontSize: 14,
-        fontFamily: 'Outfit_500Medium',
+        fontWeight: '500',
         color: '#8B5CF6',
         textTransform: 'capitalize',
     },
@@ -655,7 +702,7 @@ const styles = StyleSheet.create({
     },
     priorityTextLarge: {
         fontSize: 12,
-        fontFamily: 'Outfit_600SemiBold',
+        fontWeight: '600',
     },
     statusBadgeLarge: {
         flexDirection: 'row',
@@ -673,18 +720,17 @@ const styles = StyleSheet.create({
     },
     statusTextLarge: {
         fontSize: 13,
-        fontFamily: 'Outfit_600SemiBold',
+        fontWeight: '600',
         textTransform: 'capitalize',
     },
     productName: {
         fontSize: 18,
-        fontFamily: 'Outfit_600SemiBold',
+        fontWeight: '600',
         color: '#111827',
         marginBottom: 8,
     },
     description: {
         fontSize: 14,
-        fontFamily: 'Outfit_400Regular',
         color: '#6B7280',
         lineHeight: 20,
     },
@@ -701,7 +747,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 16,
-        fontFamily: 'Outfit_600SemiBold',
+        fontWeight: '600',
         color: '#111827',
         marginBottom: 16,
     },
@@ -715,7 +761,7 @@ const styles = StyleSheet.create({
     },
     customerName: {
         fontSize: 16,
-        fontFamily: 'Outfit_600SemiBold',
+        fontWeight: '600',
         color: '#111827',
         marginLeft: 8,
     },
@@ -731,7 +777,6 @@ const styles = StyleSheet.create({
     },
     contactText: {
         fontSize: 14,
-        fontFamily: 'Outfit_400Regular',
         color: '#6B7280',
         marginLeft: 8,
     },
@@ -765,7 +810,6 @@ const styles = StyleSheet.create({
     },
     addressText: {
         fontSize: 14,
-        fontFamily: 'Outfit_400Regular',
         color: '#6B7280',
         flex: 1,
         lineHeight: 20,
@@ -783,12 +827,12 @@ const styles = StyleSheet.create({
     },
     detailLabel: {
         fontSize: 14,
-        fontFamily: 'Outfit_500Medium',
+        fontWeight: '500',
         color: '#6B7280',
     },
     detailValue: {
         fontSize: 14,
-        fontFamily: 'Outfit_600SemiBold',
+        fontWeight: '600',
         color: '#111827',
         textAlign: 'right',
     },
@@ -813,12 +857,11 @@ const styles = StyleSheet.create({
     },
     timelineTitle: {
         fontSize: 14,
-        fontFamily: 'Outfit_600SemiBold',
+        fontWeight: '600',
         color: '#111827',
     },
     timelineDate: {
         fontSize: 12,
-        fontFamily: 'Outfit_400Regular',
         color: '#6B7280',
         marginTop: 2,
     },
@@ -837,12 +880,11 @@ const styles = StyleSheet.create({
     },
     materialText: {
         fontSize: 12,
-        fontFamily: 'Outfit_500Medium',
+        fontWeight: '500',
         color: '#4F46E5',
     },
     notesText: {
         fontSize: 14,
-        fontFamily: 'Outfit_400Regular',
         color: '#6B7280',
         lineHeight: 20,
     },
@@ -872,6 +914,77 @@ const styles = StyleSheet.create({
     actionButtonText: {
         color: '#fff',
         fontSize: 16,
-        fontFamily: 'Outfit_600SemiBold'
-    }
-})
+        fontWeight: '600'
+    },
+    // Action Sheet Styles
+    actionSheetContainer: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+    },
+    actionSheetHeader: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        paddingBottom: 20,
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    actionSheetHandle: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#D1D5DB',
+        borderRadius: 2,
+        marginBottom: 16,
+    },
+    actionSheetTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#111827',
+        marginBottom: 4,
+    },
+    actionSheetSubtitle: {
+        fontSize: 14,
+        color: '#6B7280',
+        textAlign: 'center',
+    },
+    actionSheetContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+    },
+    actionSheetItem: {
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    actionSheetItemLast: {
+        borderBottomWidth: 0,
+    },
+    actionSheetItemDestructive: {
+        // Additional styling for destructive items if needed
+    },
+    actionSheetItemContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    actionSheetItemIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#EEF2FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    actionSheetItemIconDestructive: {
+        backgroundColor: '#FEF2F2',
+    },
+    actionSheetItemText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#111827',
+    },
+    actionSheetItemTextDestructive: {
+        color: '#EF4444',
+    },
+});

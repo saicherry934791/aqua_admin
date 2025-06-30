@@ -108,7 +108,7 @@ export default function DashboardScreen() {
 
   const user = {
     name:'sai',
-    role:'SERVICE_AGENT'
+    role:UserRole.SERVICE_AGENT
   }
   
   const navigation = useNavigation();

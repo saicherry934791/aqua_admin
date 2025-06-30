@@ -84,7 +84,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
           [fieldId]: value,
         },
       }))
-      console.log('values is in change  ',values)
+    
 
       // Clear error when user starts typing after a submission attempt
       if (errors[sectionId]?.[fieldId]) {

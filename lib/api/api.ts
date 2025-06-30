@@ -147,8 +147,8 @@ class ApiService {
   }
 
   // DELETE request
-  async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
-    return this.request<T>({ ...config, method: 'DELETE', url });
+  async delete<T = any>(url: string,data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+    return this.request<T>({ ...config, method: 'DELETE', url,data });
   }
 
   // PATCH request

@@ -5,7 +5,7 @@ import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapp
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'active' | 'pending' | 'company' | 'franchised';
 
@@ -79,6 +79,65 @@ const FranchiseScreen = () => {
   useEffect(() => {
     fetchFranchises();
   }, []);
+
+  const showActionSheet = (product: any) => {
+    const options = [
+      'View Details',
+      'Edit Franchise',
+      product.isActive ? 'Deactivate' : 'Activate',
+      'Cancel'
+    ];
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: 3,
+          destructiveButtonIndex: product.isActive ? 2 : undefined,
+          title: `Manage ${product.name}`,
+          message: 'Choose an action for this product'
+        },
+        (buttonIndex) => {
+          if (buttonIndex !== 3) {
+            handleActionSheetResponse(product, buttonIndex);
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        `Manage ${product.name}`,
+        'Choose an action for this product',
+        [
+          { text: 'View Details', onPress: () => handleActionSheetResponse(product, 0) },
+          { text: 'Edit Product', onPress: () => handleActionSheetResponse(product, 1) },
+          {
+            text: product.isActive ? 'Deactivate' : 'Activate',
+            style: product.isActive ? 'destructive' : 'default',
+            onPress: () => handleActionSheetResponse(product, 2)
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ],
+        { cancelable: true }
+      );
+    }
+  };
+  const updateFranchiseStatus = async (id: string, status: boolean)=>{
+
+  }
+
+  const handleActionSheetResponse = (product: any, buttonIndex: number) => {
+    switch (buttonIndex) {
+      case 0:
+        router.push(`/franchise/${product.id}`);
+        break;
+      case 1:
+        router.push(`/franchise/add/${product.id}`);
+        break;
+      case 2:
+        updateFranchiseStatus(product.id, !product.isActive);
+        break;
+    }
+  };
 
   // Calculate statistics
   const activeFranchises = franchises.filter(f => f.status === 'Active').length;
@@ -188,7 +247,7 @@ const FranchiseScreen = () => {
             <TouchableOpacity
               key={item.id}
               style={styles.franchiseCard}
-              onPress={() => router.push('/franchise/abc')}
+              onPress={() => showActionSheet(item)}
               activeOpacity={0.7}
             >
               {/* Franchise Header */}
@@ -298,8 +357,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     // backgroundColor:'white',
     // padding:12,
-    padding:2,
-    borderRadius:100,
+    padding: 2,
+    borderRadius: 100,
     gap: 12,
   },
   filterButton: {

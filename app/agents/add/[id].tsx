@@ -1,9 +1,9 @@
 import { apiService } from "@/lib/api/api"
-import { useNavigation, useRoute } from "@react-navigation/native"
 import React, { useEffect, useState } from "react"
 import { Alert, StatusBar, Text } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
+import { router, useLocalSearchParams } from "expo-router"
 
 interface Franchise {
     id: string
@@ -11,9 +11,8 @@ interface Franchise {
 }
 
 const AgentFormScreen = () => {
-    const route = useRoute()
-    const navigation = useNavigation()
-    const { id } = route.params || {}
+
+    const { id } = useLocalSearchParams();
 
     const isNew = id === "new"
     const [initialValues, setInitialValues] = useState({})
@@ -43,17 +42,20 @@ const AgentFormScreen = () => {
 
     const fetchAgentData = async () => {
         try {
-            const response = await apiService.get(`/agents/${id}`)
+            const response = await apiService.get(`/agents?id=${id}`)
+
+     
             if (response.success && response.data) {
-                const data = response.data
+                const data = response.data[0]
+                console.log('response in getting agent ',data)
                 setInitialValues({
                     agent_info: {
-                        agentName: data.agentName || "",
-                        phoneNumber: data.phoneNumber || "",
+                        agentName: data.name || "",
+                        phoneNumber: data.number || "",
                         email: data.email || "",
                         address: data.address || "",
                         alternativePhone: data.alternativePhone || "",
-                        franchiseAreaId: data.franchiseAreaId?.toString() || "",
+                        franchiseAreaId: data.franchiseId?.toString() || "",
                     },
                 })
             }
@@ -67,6 +69,7 @@ const AgentFormScreen = () => {
 
     const handleSubmit = async (values: any) => {
         try {
+            console.log('clicked ')
             const payload = {
                 name: values.agent_info.agentName,
                 number: values.agent_info.phoneNumber,
@@ -77,16 +80,18 @@ const AgentFormScreen = () => {
             }
 
             const endpoint = isNew ? "/agents" : `/agents/${id}`
-            const method = isNew ? "post" : "put"
+            const method = isNew ? "post" : "patch"
 
+            console.log('came here ')
             const response = await apiService[method](endpoint, payload)
             
+            console.log('here completed ')
             if (!response.success) {
                 throw new Error(response.message || "Failed to save agent")
             }
 
             Alert.alert("Success", `Agent ${isNew ? "created" : "updated"} successfully`)
-            navigation.goBack()
+            router.back()
 
         } catch (error) {
             console.error("Submit Error:", error)

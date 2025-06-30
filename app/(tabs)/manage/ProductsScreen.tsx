@@ -53,24 +53,38 @@ const ProductScreen = () => {
 
   const updateProductStatus = async (productId: string, newStatus: boolean) => {
     try {
-      await apiService.patch(`/products/${productId}`, { isActive: newStatus });
-
-      setProducts(prev =>
-        prev.map(product =>
-          product.id === productId
-            ? { ...product, isActive: newStatus }
-            : product
-        )
-      );
-
-      setTimeout(() => {
-        Alert.alert(
-          'Success',
-          `Product ${newStatus ? 'activated' : 'deactivated'} successfully`,
-          [{ text: 'OK', onPress: () => { } }],
-          { cancelable: true }
+      const formData = new FormData();
+      formData.append('isActive', newStatus ? 'true' : 'false')
+      const resp = await apiService.delete(`/products/${productId}`, { isActive: newStatus });
+      console.log('resp ', resp)
+      if (resp.success) {
+        setProducts(prev =>
+          prev.map(product =>
+            product.id === productId
+              ? { ...product, isActive: newStatus }
+              : product
+          )
         );
-      }, 100);
+        setTimeout(() => {
+          Alert.alert(
+            'Success',
+            `Product ${newStatus ? 'activated' : 'deactivated'} successfully`,
+            [{ text: 'OK', onPress: () => { } }],
+            { cancelable: true }
+          );
+        }, 100);
+      }else{
+        setTimeout(() => {
+          Alert.alert(
+            'Error',
+            `Unable to update status,please try again later.`,
+            [{ text: 'OK', onPress: () => { } }],
+            { cancelable: true }
+          );
+        }, 100);
+      }
+
+
     } catch (error) {
       console.error('Error updating product status:', error);
       Alert.alert(
@@ -130,7 +144,7 @@ const ProductScreen = () => {
         router.push(`/product/${product.id}`);
         break;
       case 1:
-        router.push(`/products/edit/${product.id}`);
+        router.push(`/products/add/${product.id}`);
         break;
       case 2:
         updateProductStatus(product.id, !product.isActive);
@@ -191,8 +205,8 @@ const ProductScreen = () => {
         style={styles.scrollContent}
       >
         {/* Filter Buttons */}
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.filterScrollView}
           contentContainerStyle={styles.filterContainer}
@@ -228,7 +242,7 @@ const ProductScreen = () => {
           ))}
         </ScrollView>
 
-      
+
 
         {filteredProducts.length === 0 ? (
           <View style={styles.emptyState}>
@@ -237,7 +251,7 @@ const ProductScreen = () => {
               {activeFilter === 'all' ? 'No Products Found' : `No ${activeFilter} products`}
             </Text>
             <Text style={styles.emptySubtitle}>
-              {activeFilter === 'all' 
+              {activeFilter === 'all'
                 ? 'Add your first product to get started'
                 : `Try selecting a different filter`
               }
@@ -245,8 +259,8 @@ const ProductScreen = () => {
           </View>
         ) : (
           filteredProducts.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
+            <TouchableOpacity
+              key={item.id}
               style={styles.productCard}
               onPress={() => showActionSheet(item)}
               activeOpacity={0.7}
@@ -291,18 +305,18 @@ const ProductScreen = () => {
               {/* Product Details */}
               <View style={styles.productMetrics}>
                 <View style={styles.featuresRow}>
-                  <FeatureBadge 
-                    icon="checkmark-circle" 
-                    label="Rentable" 
-                    isActive={item.isRentable} 
+                  <FeatureBadge
+                    icon="checkmark-circle"
+                    label="Rentable"
+                    isActive={item.isRentable}
                   />
-                  <FeatureBadge 
-                    icon="bag" 
-                    label="Purchasable" 
-                    isActive={item.isPurchasable} 
+                  <FeatureBadge
+                    icon="bag"
+                    label="Purchasable"
+                    isActive={item.isPurchasable}
                   />
                 </View>
-                
+
                 <View style={styles.pricesRow}>
                   <View style={styles.priceBox}>
                     <Text style={styles.priceLabel}>Buy Price</Text>
@@ -337,19 +351,19 @@ const ProductScreen = () => {
 
 export default ProductScreen;
 
-const FeatureBadge = ({ icon, label, isActive }: { 
-  icon: string, 
-  label: string, 
-  isActive: boolean 
+const FeatureBadge = ({ icon, label, isActive }: {
+  icon: string,
+  label: string,
+  isActive: boolean
 }) => (
   <View style={[
     styles.featureBadge,
     isActive ? styles.featureActive : styles.featureInactive
   ]}>
-    <Ionicons 
-      name={icon as any} 
-      size={12} 
-      color={isActive ? '#047857' : '#9CA3AF'} 
+    <Ionicons
+      name={icon as any}
+      size={12}
+      color={isActive ? '#047857' : '#9CA3AF'}
     />
     <Text style={[
       styles.featureText,
@@ -377,8 +391,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     // backgroundColor:'white',
     // padding:12,
-    padding:2,
-    borderRadius:100,
+    padding: 2,
+    borderRadius: 100,
     gap: 12,
   },
   filterButton: {

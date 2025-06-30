@@ -2,15 +2,13 @@
 import React, { useEffect, useState } from "react"
 import { Alert, StatusBar, StyleSheet, Text, View } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
-import { useRoute, useNavigation } from "@react-navigation/native"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
 import PolygonSelector from "../../../lib/components/ui/polygon-selector"
 import { apiService } from "@/lib/api/api"
+import { router, useLocalSearchParams } from "expo-router"
 
 const FranchiseFormScreen = () => {
-    const route = useRoute()
-    const navigation = useNavigation()
-    const { id } = route.params || {}
+    const { id } = useLocalSearchParams();
 
     const isNew = id === "new"
 
@@ -27,15 +25,15 @@ const FranchiseFormScreen = () => {
     const fetchFranchiseData = async () => {
         try {
             // Simulated API call
-            const response = await fetch(`https://api.example.com/franchises/${id}`)
-            const data = await response.json()
+            const response = await apiService.get(`franchises/${id}`)
+            console.log('response  in franchisedata', response.data.franchiseArea)
 
             setInitialValues({
                 franchise_info: {
-                    franchise_name: data.name,
-                    city_name: data.city,
-                    phone_number: data.phoneNumber,
-                    franchise_polygon: data.polygon
+                    franchise_name: response.data.franchiseArea.name,
+                    city_name: response.data.franchiseArea.city,
+                    phone_number: response.data.franchiseArea.phoneNumber,
+                    franchise_polygon: response.data.franchiseArea.geoPolygon
                 }
             })
         } catch (error) {
@@ -47,7 +45,8 @@ const FranchiseFormScreen = () => {
 
     const handleSubmit = async (values: any) => {
         try {
-            console.log('values ',values)
+
+        
             const payload = {
                 name: values.franchise_info.franchise_name,
                 city: values.franchise_info.city_name,
@@ -56,23 +55,32 @@ const FranchiseFormScreen = () => {
 
             }
 
-            console.log('franchise payload ', payload)
+
 
             if (isNew) {
                 const result = await apiService.post('/franchises', payload);
-                console.log('result is in franchise creation  ', result)
+
+                if (!result.success) {
+                    throw new Error('Unable to add Franchise')
+                }
+
             } else {
-                await fetch(`https://api.example.com/franchises/${id}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                })
+                // await fetch(`/franchises/${id}`, {
+                //     method: "PUT",
+                //     headers: { "Content-Type": "application/json" },
+                //     body: JSON.stringify(payload),
+                // })
+                const result = await apiService.patch(`/franchises/${id}`, payload)
+                if (!result.success) {
+                    throw new Error('Unable to Update Franchise')
+                }
+
             }
 
             Alert.alert("Success", `Franchise ${isNew ? "created" : "updated"} successfully`)
-            navigation.goBack()
-        } catch (error) {
-            Alert.alert("Error", "Failed to submit the form")
+            router.back()
+        } catch (error: any) {
+            Alert.alert("Error", error.message || "Failed to submit the form")
         }
     }
 

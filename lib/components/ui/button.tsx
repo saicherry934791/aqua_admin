@@ -23,7 +23,10 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <TouchableOpacity
       style={[styles.base, styles[variant], styles[`${size}Size`], disabled && styles.disabled, style]}
-      onPress={onPress}
+      onPress={async ()=>{
+        console.log('came !!!!!!!!!!!!')
+        await onPress()
+      }}
       disabled={disabled}
       activeOpacity={0.7}
     >

@@ -1,14 +1,14 @@
 import { apiService } from "@/lib/api/api"
-import { useNavigation, useRoute } from "@react-navigation/native"
 import React, { useEffect, useState } from "react"
-import { Alert, StatusBar, Text } from "react-native"
+import { Alert, StatusBar, Text ,StyleSheet} from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
+import { useLocalSearchParams } from "expo-router"
 
 const ProductFormScreen = () => {
-    const route = useRoute()
-    const navigation = useNavigation()
-    const { id } = route.params || {}
+
+    const { id } = useLocalSearchParams()
+
 
     const isNew = id === "new"
     const [initialValues, setInitialValues] = useState({})
@@ -22,20 +22,26 @@ const ProductFormScreen = () => {
 
     const fetchProductData = async () => {
         try {
-            const response = await fetch(`https://api.example.com/products/${id}`)
-            const data = await response.json()
+           
+            const response = await apiService.get(`/products/${id}`)
+            const data = response.data.product;
+
+            console.log('data is ',data)
 
             setInitialValues({
                 product_info: {
                     name: data.name,
                     description: data.description,
-                    images: data.images, // assumed array
+                    images: data.images.map((image:string)=>{return {
+                        isNew:false,
+                        uri:image
+                    }}),
                     rentPrice: data.rentPrice?.toString(),
                     buyPrice: data.buyPrice?.toString(),
                     deposit: data.deposit?.toString(),
-                    isRentable: data.isRentable,
-                    isPurchasable: data.isPurchasable,
-                    isActive: data.isActive,
+                    isRentable: data.isRentable ? 'true':'false',
+                    isPurchasable: data.isPurchasable ?'true':'false',
+                    isActive: data.isActive?'true':'false',
                 },
             })
         } catch (error) {
@@ -48,6 +54,8 @@ const ProductFormScreen = () => {
     const handleSubmit = async (values: any) => {
         try {
             const formData = new FormData()
+
+            let existingImages=[]
 
             formData.append("name", values.product_info.name)
             formData.append("description", values.product_info.description)
@@ -65,22 +73,39 @@ const ProductFormScreen = () => {
                         type: "image/jpeg", // or determine dynamically
                     };
                     formData.append("images", file);
+                }else{
+                    existingImages.push(image.uri)
                 }
             }
 
 
             console.log('formData ',formData)
+            console.log('id ',id)
 
             const endpoint = isNew
                 ? "/products"
-                : `/${id}`
+                : `/products/${id}`
 
-            const response = await apiService.post(endpoint, formData, {
-                headers: {
-                    "Content-Type": "multipart/form-data",
+            let response ;
+
+            if(isNew){
+                response = await apiService.post(endpoint, formData, {
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    }
                 }
+                )
+
+            }else{
+                formData.append("existingImages",JSON.stringify(existingImages))
+                response = await apiService.put(endpoint,formData,{
+                    headers: {
+                        "Content-Type": "multipart/form-data",
+                    }
+                })
             }
-            )
+
+             
             if (!response.success) throw new Error("Upload failed")
 
             Alert.alert("Success", `Product ${isNew ? "created" : "updated"} successfully`)
@@ -242,3 +267,10 @@ const ProductFormScreen = () => {
 
 
 export default ProductFormScreen
+
+
+const styles= StyleSheet.create({
+    container :{
+        flex:1
+    }
+})

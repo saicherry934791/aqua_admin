@@ -14,7 +14,7 @@ interface PolygonSelectorProps {
   onAreaComplete?: (area: { coordinates: Coordinate[] }) => void;
   onChange?: (area: { coordinates: Coordinate[] }) => void;
   initialRegion?: Region;
-  initialArea?: Coordinate[];
+  value?: Coordinate[];
   isEditing?: boolean;
   label?: string;
   error?: string;
@@ -25,11 +25,12 @@ const PolygonSelector: React.FC<PolygonSelectorProps> = ({
   onAreaComplete,
   onChange,
   initialRegion,
-  initialArea,
+  value: initialArea,
   isEditing = false,
   label,
   error,
 }) => {
+  console.log('initialArea ',initialArea)
   const mapRef = useRef<MapView>(null);
   const editableMapRef = useRef<MapView>(null);
   const actionSheetRef = useRef<ActionSheetRef>(null);
@@ -66,16 +67,20 @@ const PolygonSelector: React.FC<PolygonSelectorProps> = ({
 
   // Fit map to initial area if provided
   useEffect(() => {
+  
     if (initialArea && initialArea.length > 0 && mapRef.current) {
       mapRef.current.fitToCoordinates(initialArea, {
         edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
         animated: true,
       });
     }
+  
   }, [initialArea]);
 
   useEffect(() => {
+    console.log('called on first')
     if (hasValidPolygon && drawingPoints.length > 2 && mapRef.current) {
+      console.log('setting ')
       mapRef.current.fitToCoordinates(drawingPoints, {
         edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
         animated: true,
@@ -378,6 +383,14 @@ const PolygonSelector: React.FC<PolygonSelectorProps> = ({
           zoomEnabled={true}
           rotateEnabled={false}
           pitchEnabled={false}
+          onMapReady={() => {
+            if (initialArea && initialArea.length > 0) {
+              mapRef.current?.fitToCoordinates(initialArea, {
+                edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                animated: true,
+              });
+            }
+          }}
         >
           {/* Existing franchise areas */}
           {existingAreas.map((area, index) => (
@@ -401,7 +414,7 @@ const PolygonSelector: React.FC<PolygonSelectorProps> = ({
           )}
 
           {/* Static markers for saved polygon */}
-          {drawingPoints.map((point, index) => (
+          {drawingPoints?.map((point, index) => (
             <Marker
               key={`static-point-${index}`}
               coordinate={point}

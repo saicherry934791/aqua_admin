@@ -4,7 +4,7 @@ import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'active' | 'inactive' | 'recent';
 
@@ -18,7 +18,7 @@ const AgentScreen = () => {
         try {
             setLoading(true);
             const result = await apiService.get('/agents');
-
+            console.log('service agents ',result.data)
             if (result.success && Array.isArray(result.data)) {
                 const mapped = result.data.map((item: any) => ({
                     id: item.id,
@@ -100,6 +100,69 @@ const AgentScreen = () => {
         return name.split(' ').map(n => n[0]).join('').toUpperCase();
     };
 
+    const showActionSheet = (product: any) => {
+        const options = [
+          'View Details',
+          'Edit Product',
+          product.isActive ? 'Deactivate' : 'Activate',
+          'Cancel'
+        ];
+    
+        if (Platform.OS === 'ios') {
+          ActionSheetIOS.showActionSheetWithOptions(
+            {
+              options,
+              cancelButtonIndex: 3,
+              destructiveButtonIndex: product.isActive ? 2 : undefined,
+              title: `Manage ${product.name}`,
+              message: 'Choose an action for this product'
+            },
+            (buttonIndex) => {
+              if (buttonIndex !== 3) {
+                handleActionSheetResponse(product, buttonIndex);
+              }
+            }
+          );
+        } else {
+          Alert.alert(
+            `Manage ${product.name}`,
+            'Choose an action for this product',
+            [
+              { text: 'View Details', onPress: () => handleActionSheetResponse(product, 0) },
+              { text: 'Edit Product', onPress: () => handleActionSheetResponse(product, 1) },
+              {
+                text: product.isActive ? 'Deactivate' : 'Activate',
+                style: product.isActive ? 'destructive' : 'default',
+                onPress: () => handleActionSheetResponse(product, 2)
+              },
+              { text: 'Cancel', style: 'cancel' }
+            ],
+            { cancelable: true }
+          );
+        }
+      };
+
+      const updateAgentStatus = async (product:any,status:boolean)=>{
+
+
+
+      }
+    
+      const handleActionSheetResponse = (product: any, buttonIndex: number) => {
+        switch (buttonIndex) {
+          case 0:
+            router.push(`/agents/${product.id}`);
+            break;
+          case 1:
+            router.push(`/agents/add/${product.id}`);
+            break;
+          case 2:
+            updateAgentStatus(product.id, !product.isActive);
+            break;
+        }
+      };
+    
+
     return (
         <View style={styles.container}>
             <SkeletonWrapper
@@ -164,7 +227,7 @@ const AgentScreen = () => {
                         <TouchableOpacity
                             key={item.id}
                             style={styles.agentCard}
-                            onPress={() => handleEditAgent(item.id)}
+                            onPress={()=>showActionSheet(item)}
                             activeOpacity={0.7}
                         >
                             {/* Agent Header */}
