@@ -2,6 +2,7 @@ import { createMaterialTopTabNavigator } from '@react-navigation/material-top-ta
 import { useLocalSearchParams, useNavigation } from 'expo-router'
 import React, { useLayoutEffect } from 'react'
 import { Text } from 'react-native'
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext'
 
 // Import separate screens
 import AgentsScreen from './AgentScreen'
@@ -13,10 +14,37 @@ const Tab = createMaterialTopTabNavigator()
 
 const Manage = () => {
     const navigation = useNavigation()
-
+    const { user } = useAuth()
     const { tab } = useLocalSearchParams();
-    const initialTab = typeof tab === 'string' ? tab : 'Franchises';
+    const initialTab = typeof tab === 'string' ? tab : getDefaultTab();
 
+    function getDefaultTab() {
+        if (!user) return 'Products';
+        
+        switch (user.role) {
+            case UserRole.SUPER_ADMIN:
+                return 'Products';
+            case UserRole.FRANCHISE_OWNER:
+                return 'Agents';
+            default:
+                return 'Products';
+        }
+    }
+
+    const getTabsForRole = () => {
+        if (!user) return [];
+
+        const allTabs = [
+            { name: 'Products', component: ProductsScreen, roles: [UserRole.SUPER_ADMIN] },
+            { name: 'Franchises', component: FranchiseScreen, roles: [UserRole.SUPER_ADMIN] },
+            { name: 'Agents', component: AgentsScreen, roles: [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER] },
+            { name: 'Customers', component: CustomersScreen, roles: [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER] },
+        ];
+
+        return allTabs.filter(tab => tab.roles.includes(user.role));
+    };
+
+    const availableTabs = getTabsForRole();
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -28,23 +56,30 @@ const Manage = () => {
         });
     }, [navigation]);
 
+    if (availableTabs.length === 0) {
+        return (
+            <Text style={{ textAlign: 'center', marginTop: 50 }}>
+                No management options available for your role.
+            </Text>
+        );
+    }
+
     return (
         <Tab.Navigator
             initialRouteName={initialTab}
             screenOptions={{
                 swipeEnabled: false,
-
                 tabBarScrollEnabled: true,
-                tabBarActiveTintColor: '#121517', // active tab text color
-                tabBarInactiveTintColor: '#121517', // inactive tab text color
+                tabBarActiveTintColor: '#121517',
+                tabBarInactiveTintColor: '#121517',
                 tabBarIndicatorStyle: {
-                    backgroundColor: '#121517', // underline color for active tab
+                    backgroundColor: '#121517',
                     height: 3,
                     borderRadius: 999,
                 },
                 tabBarLabelStyle: {
                     fontSize: 18,
-                    fontFamily: 'Outfit_600SemiBold', // 👈 use your custom font here
+                    fontFamily: 'Outfit_600SemiBold',
                     textTransform: 'none',
                 },
                 tabBarStyle: {
@@ -54,15 +89,17 @@ const Manage = () => {
                     elevation: 0,
                 },
                 tabBarItemStyle: {
-                    width: 'auto',           // ✅ Don’t force equal width
+                    width: 'auto',
                 },
             }}
         >
-            <Tab.Screen name="Products" component={ProductsScreen} />
-            <Tab.Screen name="Franchises" component={FranchiseScreen} />
-
-            <Tab.Screen name="Agents" component={AgentsScreen} />
-            <Tab.Screen name="Customers" component={CustomersScreen} />
+            {availableTabs.map((tab) => (
+                <Tab.Screen 
+                    key={tab.name}
+                    name={tab.name} 
+                    component={tab.component} 
+                />
+            ))}
         </Tab.Navigator>
     )
 }

@@ -104,12 +104,7 @@ export default function DashboardScreen() {
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
 
-  // const { user } = useAuth(); // Get current user
-
-  const user = {
-    name:'sai',
-    role:UserRole.SERVICE_AGENT
-  }
+  const { user } = useAuth();
   
   const navigation = useNavigation();
 
@@ -121,24 +116,19 @@ export default function DashboardScreen() {
     { name: 'Cancelled', population: 10, color: '#EF4444' }
   ];
 
-
-
   const lineChartData: LineChartData = {
     labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
     datasets: [
       {
         label: 'Revenue',
         data: [4000, 3000, 2000, 2780, 1890, 2390],
-        // color: '#4c6ef5', // optional, pick your preferred color
       },
       {
         label: 'Orders',
         data: [240, 139, 980, 390, 480, 380],
-        // color: '#f06595', // optional
       },
     ],
   };
-
 
   const barChartData: BarChartData = {
     labels: ['Products', 'Services', 'Rentals', 'Sales'],
@@ -146,11 +136,9 @@ export default function DashboardScreen() {
       {
         label: 'Values',
         data: [25, 15, 30, 20],
-        // color: '#22c55e', // optional color
       },
     ],
   };
-
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -300,7 +288,10 @@ export default function DashboardScreen() {
                   subtitle="View & assign areas"
                   icon={MapPin}
                   color="#007bff"
-                  onPress={() => router.push('/manage-franchises')}
+                  onPress={() => router.push({
+                    pathname: '/manage',
+                    params: { tab: 'Franchises' },
+                  })}
                 />
                 <QuickActionCard
                   title="System Analytics"
@@ -523,14 +514,14 @@ export default function DashboardScreen() {
                   subtitle="Check assigned work"
                   icon={Wrench}
                   color="#007bff"
-                  onPress={() => router.push('/service-tasks')}
+                  onPress={() => router.push('/service')}
                 />
                 <QuickActionCard
-                  title="Update Status"
-                  subtitle="Mark task complete"
-                  icon={Activity}
+                  title="Check Orders"
+                  subtitle="View order status"
+                  icon={Package}
                   color="#10B981"
-                  onPress={() => router.push('/update-status')}
+                  onPress={() => router.push('/orders')}
                 />
               </View>
             </View>

@@ -10,35 +10,16 @@ import { getApp } from '@react-native-firebase/app';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { apiService } from '../api/api';
 
-// // Initialize Firebase app and auth
-// const app = getApp();
-// const auth = getAuth(app);
-
-// if (__DEV__) {
-//     // Use your computer's IP address, not localhost
-//     const EMULATOR_HOST = '192.168.2.38'; // For Android emulator
-//     // const EMULATOR_HOST = 'localhost'; // For iOS simulator
-//     // const EMULATOR_HOST = '10.0.2.2'; // Alternative for Android emulator
-
-//     try {
-//         // connectAuthEmulator(auth, `http://${EMULATOR_HOST}:9099`)
-//         auth.useEmulator("http://192.168.2.38:9099")
-//         console.log('connected emulator ')
-//     } catch (error) {
-//         console.log('Emulator already connected or error:', error);
-//     }
-// }
-
 export enum UserRole {
     SUPER_ADMIN = 'admin',
-    FRANCHISE_OWNER = 'FRANCHISE_OWNER',
-    SERVICE_AGENT = 'SERVICE_AGENT',
+    FRANCHISE_OWNER = 'Franchise',
+    SERVICE_AGENT = 'Agent',
 }
 
 export enum CustomerType {
-    ADMIN = 'ADMIN',
-    FRANCHISE = 'FRANCHISE',
-    AGENT = 'AGENT',
+    ADMIN = 'admin',
+    FRANCHISE = 'Franchise',
+    AGENT = 'Agent',
 }
 
 export interface User {
@@ -83,6 +64,7 @@ interface AuthContextType {
     // Permission checking
     hasPermission: (permission: string) => boolean;
     canAccessScreen: (screenName: string) => boolean;
+    canAccessTab: (tabName: string) => boolean;
 
     // Refresh user data
     refreshUser: () => Promise<void>;
@@ -229,7 +211,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setIsLoading(true);
 
             // Sign out from React Native Firebase using modular SDK
-            await signOut(auth);
+            await signOut(getAuth());
 
             // Clear local storage
             await clearAuthData();
@@ -382,6 +364,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return allowedRoles ? allowedRoles.includes(user.role) : true;
     };
 
+    const canAccessTab = (tabName: string): boolean => {
+        if (!user) return false;
+
+        // Define tab access based on roles
+        const tabPermissions: Record<string, UserRole[]> = {
+            'index': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Dashboard
+            'manage': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER], // Manage tab
+            'orders': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Orders
+            'service': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Service requests
+            'notifications': [UserRole.SERVICE_AGENT], // Notifications (Service agents only)
+            'profile': [UserRole.SUPER_ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Profile
+        };
+
+        const allowedRoles = tabPermissions[tabName];
+        return allowedRoles ? allowedRoles.includes(user.role) : false;
+    };
+
     const refreshUser = async () => {
         try {
             const response = await apiService.get('/auth/me');
@@ -412,6 +411,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         exitViewAs,
         hasPermission,
         canAccessScreen,
+        canAccessTab,
         refreshUser,
     };
 

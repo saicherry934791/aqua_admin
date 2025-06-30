@@ -4,12 +4,12 @@ import { Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { Colors } from '@/lib/constants/Colors';
-import { useAuth } from '@/lib/contexts/AuthContext';
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { useColorScheme } from '@/lib/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user, canAccessTab } = useAuth();
 
   if (isLoading) return null;
 
@@ -17,6 +17,49 @@ export default function TabLayout() {
   if (!isAuthenticated) {
     return <Redirect href="/(auth)" />;
   }
+
+  // Get tabs based on user role
+  const getTabsForRole = () => {
+    if (!user) return [];
+
+    const allTabs = [
+      {
+        name: 'index',
+        title: 'Dashboard',
+        icon: 'dashboard' as keyof typeof MaterialIcons.glyphMap,
+      },
+      {
+        name: 'manage',
+        title: 'Manage',
+        icon: 'settings' as keyof typeof MaterialIcons.glyphMap,
+      },
+      {
+        name: 'orders',
+        title: 'Orders',
+        icon: 'shopping-cart' as keyof typeof MaterialIcons.glyphMap,
+      },
+      {
+        name: 'service',
+        title: 'Services',
+        icon: 'miscellaneous-services' as keyof typeof MaterialIcons.glyphMap,
+      },
+      {
+        name: 'notifications',
+        title: 'Notifications',
+        icon: 'notifications' as keyof typeof MaterialIcons.glyphMap,
+      },
+      {
+        name: 'profile',
+        title: 'Profile',
+        icon: 'person' as keyof typeof MaterialIcons.glyphMap,
+      },
+    ];
+
+    // Filter tabs based on user role permissions
+    return allTabs.filter(tab => canAccessTab(tab.name));
+  };
+
+  const availableTabs = getTabsForRole();
 
   return (
     <Tabs
@@ -30,53 +73,20 @@ export default function TabLayout() {
           default: {},
         }),
       }}
-      initialRouteName="manage"
+      initialRouteName="index"
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="dashboard" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="manage"
-        options={{
-          title: 'Manage',
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="settings" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'Orders',
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="shopping-cart" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="service"
-        options={{
-          title: 'Services',
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="miscellaneous-services" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="person" color={color} />
-          ),
-        }}
-      />
+      {availableTabs.map((tab) => (
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: tab.title,
+            tabBarIcon: ({ color }) => (
+              <TabBarIcon name={tab.icon} color={color} />
+            ),
+          }}
+        />
+      ))}
     </Tabs>
   );
 }
