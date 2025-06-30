@@ -58,10 +58,10 @@ interface AuthContextType {
     verifyOTP: (otp: string, role: string) => Promise<boolean>;
     logout: () => Promise<void>;
 
-    // View As functionality
-    viewAsFranchiseOwner: (franchiseId: string, franchiseName: string) => Promise<boolean>;
-    viewAsServiceAgent: (agentId: string, agentName: string, franchiseId: string) => Promise<boolean>;
-    exitViewAs: () => Promise<void>;
+    // View As functionality (client-side only)
+    viewAsFranchiseOwner: (franchiseId: string, franchiseName: string) => void;
+    viewAsServiceAgent: (agentId: string, agentName: string, franchiseId: string) => void;
+    exitViewAs: () => void;
 
     // Permission checking
     hasPermission: (permission: string) => boolean;
@@ -241,113 +241,94 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ]);
     };
 
-    const viewAsFranchiseOwner = async (franchiseId: string, franchiseName: string): Promise<boolean> => {
+    // Client-side only view as functionality
+    const viewAsFranchiseOwner = (franchiseId: string, franchiseName: string) => {
         if (!user || user.role !== UserRole.ADMIN) {
-            return false;
+            return;
         }
 
-        try {
-            const response = await apiService.post('/auth/view-as-franchise', {
-                franchiseId,
-            });
+        // Create a mock franchise owner user based on the original admin user
+        const franchiseUser: User = {
+            ...user,
+            role: UserRole.FRANCHISE_OWNER,
+            customerType: CustomerType.FRANCHISE,
+            franchiseId: franchiseId,
+            franchiseName: franchiseName,
+        };
 
-            if (response.success) {
-                const { viewAsUser, accessToken } = response.data;
+        const newViewAsState: ViewAsState = {
+            isViewingAs: true,
+            originalUser: user,
+            currentViewRole: UserRole.FRANCHISE_OWNER,
+            targetFranchiseId: franchiseId,
+            targetFranchiseName: franchiseName,
+        };
 
-                // Update tokens
-                await AsyncStorage.setItem('accessToken', accessToken);
+        setViewAsState(newViewAsState);
+        setUser(franchiseUser);
 
-                // Set view as state
-                const newViewAsState: ViewAsState = {
-                    isViewingAs: true,
-                    originalUser: user,
-                    currentViewRole: UserRole.FRANCHISE_OWNER,
-                    targetFranchiseId: franchiseId,
-                    targetFranchiseName: franchiseName,
-                };
-
-                setViewAsState(newViewAsState);
-                setUser(viewAsUser);
-
-                await AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
-
-                return true;
-            }
-        } catch (error) {
-            console.error('View as franchise owner error:', error);
-        }
-
-        return false;
+        // Persist view state
+        AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
     };
 
-    const viewAsServiceAgent = async (agentId: string, agentName: string, franchiseId: string): Promise<boolean> => {
+    const viewAsServiceAgent = (agentId: string, agentName: string, franchiseId: string) => {
         if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.FRANCHISE_OWNER)) {
-            return false;
+            return;
         }
 
-        try {
-            const response = await apiService.post('/auth/view-as-agent', {
-                agentId,
-                franchiseId,
-            });
-
-            if (response.success) {
-                const { viewAsUser, accessToken } = response.data;
-
-                await AsyncStorage.setItem('accessToken', accessToken);
-
-                const newViewAsState: ViewAsState = {
-                    isViewingAs: true,
-                    originalUser: viewAsState.isViewingAs ? viewAsState.originalUser : user,
-                    currentViewRole: UserRole.SERVICE_AGENT,
-                    targetFranchiseId: franchiseId,
-                    targetUserId: agentId,
-                    targetUserName: agentName,
-                };
-
-                setViewAsState(newViewAsState);
-                setUser(viewAsUser);
-
-                await AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
-
-                return true;
+        // Create a mock service agent user based on the original user
+        const agentUser: User = {
+            ...user,
+            role: UserRole.SERVICE_AGENT,
+            customerType: CustomerType.AGENT,
+            franchiseId: franchiseId,
+            profile: {
+                ...user.profile,
+                name: agentName,
             }
-        } catch (error) {
-            console.error('View as service agent error:', error);
-        }
+        };
 
-        return false;
+        const newViewAsState: ViewAsState = {
+            isViewingAs: true,
+            originalUser: viewAsState.isViewingAs ? viewAsState.originalUser : user,
+            currentViewRole: UserRole.SERVICE_AGENT,
+            targetFranchiseId: franchiseId,
+            targetUserId: agentId,
+            targetUserName: agentName,
+        };
+
+        setViewAsState(newViewAsState);
+        setUser(agentUser);
+
+        // Persist view state
+        AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
     };
 
-    const exitViewAs = async () => {
+    const exitViewAs = () => {
         if (!viewAsState.isViewingAs || !viewAsState.originalUser) {
             return;
         }
 
-        try {
-            const response = await apiService.post('/auth/exit-view-as');
+        // Restore original user
+        setUser(viewAsState.originalUser);
+        setViewAsState({
+            isViewingAs: false,
+            originalUser: null,
+            currentViewRole: null,
+        });
 
-            if (response.success) {
-                const { accessToken } = response.data;
-
-                await AsyncStorage.setItem('accessToken', accessToken);
-                await AsyncStorage.removeItem('viewAsState');
-
-                setUser(viewAsState.originalUser);
-                setViewAsState({
-                    isViewingAs: false,
-                    originalUser: null,
-                    currentViewRole: null,
-                });
-            }
-        } catch (error) {
-            console.error('Exit view as error:', error);
-        }
+        // Clear persisted view state
+        AsyncStorage.removeItem('viewAsState');
     };
 
     const hasPermission = (permission: string): boolean => {
         if (!user) return false;
-        return user.permissions.includes(permission);
+        
+        // If viewing as someone else, check original user's permissions
+        const checkUser = viewAsState.isViewingAs ? viewAsState.originalUser : user;
+        if (!checkUser) return false;
+        
+        return checkUser.permissions.includes(permission);
     };
 
     const canAccessScreen = (screenName: string): boolean => {
@@ -389,8 +370,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
             const response = await apiService.get('/auth/me');
             if (response.success) {
-                setUser(response.data);
-                await AsyncStorage.setItem('userProfile', JSON.stringify(response.data));
+                // Only update if not in view-as mode
+                if (!viewAsState.isViewingAs) {
+                    setUser(response.data);
+                    await AsyncStorage.setItem('userProfile', JSON.stringify(response.data));
+                }
             }
         } catch (error: any) {
             console.error('Refresh user error:', error);

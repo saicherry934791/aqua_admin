@@ -161,22 +161,13 @@ const AgentScreen = () => {
         // Implementation for updating agent status
     };
 
-    const handleViewAsAgent = async (agent: any) => {
-        try {
-            const success = await viewAsServiceAgent(agent.id, agent.name, agent.franchiseId || '');
-            if (success) {
-                Alert.alert(
-                    'View Mode Changed',
-                    `You are now viewing as ${agent.name} (Service Agent). You can switch back anytime from the banner at the top.`,
-                    [{ text: 'OK' }]
-                );
-            } else {
-                Alert.alert('Error', 'Failed to switch to agent view. Please try again.');
-            }
-        } catch (error) {
-            console.error('View as agent error:', error);
-            Alert.alert('Error', 'Failed to switch to agent view. Please try again.');
-        }
+    const handleViewAsAgent = (agent: any) => {
+        viewAsServiceAgent(agent.id, agent.name, agent.franchiseId || '');
+        Alert.alert(
+            'View Mode Changed',
+            `You are now viewing as ${agent.name} (Service Agent). You can switch back anytime from the banner at the top.`,
+            [{ text: 'OK' }]
+        );
     };
 
     const handleActionSheetResponse = (agent: any, buttonIndex: number) => {

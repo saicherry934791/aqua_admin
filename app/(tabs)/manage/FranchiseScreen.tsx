@@ -130,22 +130,13 @@ const FranchiseScreen = () => {
     // Implementation for updating franchise status
   };
 
-  const handleViewAsFranchise = async (franchise: any) => {
-    try {
-      const success = await viewAsFranchiseOwner(franchise.id, franchise.name);
-      if (success) {
-        Alert.alert(
-          'View Mode Changed',
-          `You are now viewing as ${franchise.name} franchise owner. You can switch back anytime from the banner at the top.`,
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert('Error', 'Failed to switch to franchise view. Please try again.');
-      }
-    } catch (error) {
-      console.error('View as franchise error:', error);
-      Alert.alert('Error', 'Failed to switch to franchise view. Please try again.');
-    }
+  const handleViewAsFranchise = (franchise: any) => {
+    viewAsFranchiseOwner(franchise.id, franchise.name);
+    Alert.alert(
+      'View Mode Changed',
+      `You are now viewing as ${franchise.name} franchise owner. You can switch back anytime from the banner at the top.`,
+      [{ text: 'OK' }]
+    );
   };
 
   const handleActionSheetResponse = (franchise: any, buttonIndex: number) => {
