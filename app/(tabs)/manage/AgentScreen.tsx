@@ -5,6 +5,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 
 type FilterType = 'all' | 'active' | 'inactive' | 'recent';
 
@@ -13,12 +14,13 @@ const AgentScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+    const { user, viewAsServiceAgent } = useAuth();
 
     const fetchAgents = async () => {
         try {
             setLoading(true);
             const result = await apiService.get('/agents');
-            console.log('service agents ',result.data)
+            console.log('service agents ', result.data)
             if (result.success && Array.isArray(result.data)) {
                 const mapped = result.data.map((item: any) => ({
                     id: item.id,
@@ -27,6 +29,7 @@ const AgentScreen = () => {
                     phone: item.number,
                     isActive: item.active,
                     franchise: item.franchiseName || 'Global Agent',
+                    franchiseId: item.franchiseId,
                     createdAt: item.joined,
                     joinDate: new Date(item.joined),
                     serviceRequestsCount: item.serviceRequestsCount,
@@ -100,68 +103,106 @@ const AgentScreen = () => {
         return name.split(' ').map(n => n[0]).join('').toUpperCase();
     };
 
-    const showActionSheet = (product: any) => {
+    const showActionSheet = (agent: any) => {
         const options = [
-          'View Details',
-          'Edit Product',
-          product.isActive ? 'Deactivate' : 'Activate',
-          'Cancel'
+            'View Details',
+            'Edit Agent',
+            ...(user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER ? ['View as Agent'] : []),
+            agent.isActive ? 'Deactivate' : 'Activate',
+            'Cancel'
         ];
-    
+
+        const cancelIndex = options.length - 1;
+        const destructiveIndex = agent.isActive ? options.length - 2 : undefined;
+
         if (Platform.OS === 'ios') {
-          ActionSheetIOS.showActionSheetWithOptions(
-            {
-              options,
-              cancelButtonIndex: 3,
-              destructiveButtonIndex: product.isActive ? 2 : undefined,
-              title: `Manage ${product.name}`,
-              message: 'Choose an action for this product'
-            },
-            (buttonIndex) => {
-              if (buttonIndex !== 3) {
-                handleActionSheetResponse(product, buttonIndex);
-              }
-            }
-          );
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    options,
+                    cancelButtonIndex: cancelIndex,
+                    destructiveButtonIndex: destructiveIndex,
+                    title: `Manage ${agent.name}`,
+                    message: 'Choose an action for this agent'
+                },
+                (buttonIndex) => {
+                    if (buttonIndex !== cancelIndex) {
+                        handleActionSheetResponse(agent, buttonIndex);
+                    }
+                }
+            );
         } else {
-          Alert.alert(
-            `Manage ${product.name}`,
-            'Choose an action for this product',
-            [
-              { text: 'View Details', onPress: () => handleActionSheetResponse(product, 0) },
-              { text: 'Edit Product', onPress: () => handleActionSheetResponse(product, 1) },
-              {
-                text: product.isActive ? 'Deactivate' : 'Activate',
-                style: product.isActive ? 'destructive' : 'default',
-                onPress: () => handleActionSheetResponse(product, 2)
-              },
-              { text: 'Cancel', style: 'cancel' }
-            ],
-            { cancelable: true }
-          );
+            const alertOptions = [
+                { text: 'View Details', onPress: () => handleActionSheetResponse(agent, 0) },
+                { text: 'Edit Agent', onPress: () => handleActionSheetResponse(agent, 1) },
+            ];
+
+            if (user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER) {
+                alertOptions.push({ text: 'View as Agent', onPress: () => handleActionSheetResponse(agent, 2) });
+            }
+
+            alertOptions.push({
+                text: agent.isActive ? 'Deactivate' : 'Activate',
+                style: agent.isActive ? 'destructive' : 'default',
+                onPress: () => handleActionSheetResponse(agent, options.length - 2)
+            });
+
+            alertOptions.push({ text: 'Cancel', style: 'cancel' });
+
+            Alert.alert(
+                `Manage ${agent.name}`,
+                'Choose an action for this agent',
+                alertOptions,
+                { cancelable: true }
+            );
         }
-      };
+    };
 
-      const updateAgentStatus = async (product:any,status:boolean)=>{
+    const updateAgentStatus = async (agentId: string, status: boolean) => {
+        // Implementation for updating agent status
+    };
 
+    const handleViewAsAgent = async (agent: any) => {
+        try {
+            const success = await viewAsServiceAgent(agent.id, agent.name, agent.franchiseId || '');
+            if (success) {
+                Alert.alert(
+                    'View Mode Changed',
+                    `You are now viewing as ${agent.name} (Service Agent). You can switch back anytime from the banner at the top.`,
+                    [{ text: 'OK' }]
+                );
+            } else {
+                Alert.alert('Error', 'Failed to switch to agent view. Please try again.');
+            }
+        } catch (error) {
+            console.error('View as agent error:', error);
+            Alert.alert('Error', 'Failed to switch to agent view. Please try again.');
+        }
+    };
 
-
-      }
-    
-      const handleActionSheetResponse = (product: any, buttonIndex: number) => {
+    const handleActionSheetResponse = (agent: any, buttonIndex: number) => {
+        const hasViewAsOption = user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER;
+        
         switch (buttonIndex) {
-          case 0:
-            router.push(`/agents/${product.id}`);
-            break;
-          case 1:
-            router.push(`/agents/add/${product.id}`);
-            break;
-          case 2:
-            updateAgentStatus(product.id, !product.isActive);
-            break;
+            case 0:
+                router.push(`/agents/${agent.id}`);
+                break;
+            case 1:
+                router.push(`/agents/add/${agent.id}`);
+                break;
+            case 2:
+                if (hasViewAsOption) {
+                    handleViewAsAgent(agent);
+                } else {
+                    updateAgentStatus(agent.id, !agent.isActive);
+                }
+                break;
+            case 3:
+                if (hasViewAsOption) {
+                    updateAgentStatus(agent.id, !agent.isActive);
+                }
+                break;
         }
-      };
-    
+    };
 
     return (
         <View style={styles.container}>
@@ -227,7 +268,7 @@ const AgentScreen = () => {
                         <TouchableOpacity
                             key={item.id}
                             style={styles.agentCard}
-                            onPress={()=>showActionSheet(item)}
+                            onPress={() => showActionSheet(item)}
                             activeOpacity={0.7}
                         >
                             {/* Agent Header */}
@@ -291,13 +332,26 @@ const AgentScreen = () => {
                                     <View style={styles.metricBox}>
                                         <Text style={styles.metricLabel}>Joined</Text>
                                         <Text style={styles.metricValue}>
-                                            {item.joinDate.toLocaleDateString('en-US', { 
-                                                month: 'short', 
-                                                year: 'numeric' 
+                                            {item.joinDate.toLocaleDateString('en-US', {
+                                                month: 'short',
+                                                year: 'numeric'
                                             })}
                                         </Text>
                                     </View>
                                 </View>
+
+                                {/* View As Button for Admin and Franchise Owner */}
+                                {(user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER) && (
+                                    <View style={styles.actionButtonsRow}>
+                                        <TouchableOpacity
+                                            style={styles.viewAsButton}
+                                            onPress={() => handleViewAsAgent(item)}
+                                        >
+                                            <Ionicons name="eye" size={16} color="#10B981" />
+                                            <Text style={styles.viewAsButtonText}>View as Agent</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                             </View>
                         </TouchableOpacity>
                     ))
@@ -493,6 +547,7 @@ const styles = StyleSheet.create({
     metricsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        marginBottom: 12,
     },
     metricBox: {
         alignItems: 'center',
@@ -508,6 +563,27 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontFamily: 'Outfit_600SemiBold',
         color: '#111827',
+    },
+    actionButtonsRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 8,
+    },
+    viewAsButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#A7F3D0',
+    },
+    viewAsButtonText: {
+        fontSize: 12,
+        fontFamily: 'Outfit_600SemiBold',
+        color: '#10B981',
+        marginLeft: 6,
     },
     fab: {
         position: 'absolute',

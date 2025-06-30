@@ -6,6 +6,7 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 type FilterType = 'all' | 'active' | 'pending' | 'company' | 'franchised';
 
@@ -15,6 +16,7 @@ const FranchiseScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const { viewAsFranchiseOwner } = useAuth();
 
   const fetchFranchises = async () => {
     try {
@@ -80,11 +82,12 @@ const FranchiseScreen = () => {
     fetchFranchises();
   }, []);
 
-  const showActionSheet = (product: any) => {
+  const showActionSheet = (franchise: any) => {
     const options = [
       'View Details',
       'Edit Franchise',
-      product.isActive ? 'Deactivate' : 'Activate',
+      'View as Franchise',
+      franchise.status === 'Active' ? 'Deactivate' : 'Activate',
       'Cancel'
     ];
 
@@ -92,28 +95,29 @@ const FranchiseScreen = () => {
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options,
-          cancelButtonIndex: 3,
-          destructiveButtonIndex: product.isActive ? 2 : undefined,
-          title: `Manage ${product.name}`,
-          message: 'Choose an action for this product'
+          cancelButtonIndex: 4,
+          destructiveButtonIndex: franchise.status === 'Active' ? 3 : undefined,
+          title: `Manage ${franchise.name}`,
+          message: 'Choose an action for this franchise'
         },
         (buttonIndex) => {
-          if (buttonIndex !== 3) {
-            handleActionSheetResponse(product, buttonIndex);
+          if (buttonIndex !== 4) {
+            handleActionSheetResponse(franchise, buttonIndex);
           }
         }
       );
     } else {
       Alert.alert(
-        `Manage ${product.name}`,
-        'Choose an action for this product',
+        `Manage ${franchise.name}`,
+        'Choose an action for this franchise',
         [
-          { text: 'View Details', onPress: () => handleActionSheetResponse(product, 0) },
-          { text: 'Edit Product', onPress: () => handleActionSheetResponse(product, 1) },
+          { text: 'View Details', onPress: () => handleActionSheetResponse(franchise, 0) },
+          { text: 'Edit Franchise', onPress: () => handleActionSheetResponse(franchise, 1) },
+          { text: 'View as Franchise', onPress: () => handleActionSheetResponse(franchise, 2) },
           {
-            text: product.isActive ? 'Deactivate' : 'Activate',
-            style: product.isActive ? 'destructive' : 'default',
-            onPress: () => handleActionSheetResponse(product, 2)
+            text: franchise.status === 'Active' ? 'Deactivate' : 'Activate',
+            style: franchise.status === 'Active' ? 'destructive' : 'default',
+            onPress: () => handleActionSheetResponse(franchise, 3)
           },
           { text: 'Cancel', style: 'cancel' }
         ],
@@ -121,20 +125,42 @@ const FranchiseScreen = () => {
       );
     }
   };
-  const updateFranchiseStatus = async (id: string, status: boolean)=>{
 
-  }
+  const updateFranchiseStatus = async (id: string, status: boolean) => {
+    // Implementation for updating franchise status
+  };
 
-  const handleActionSheetResponse = (product: any, buttonIndex: number) => {
+  const handleViewAsFranchise = async (franchise: any) => {
+    try {
+      const success = await viewAsFranchiseOwner(franchise.id, franchise.name);
+      if (success) {
+        Alert.alert(
+          'View Mode Changed',
+          `You are now viewing as ${franchise.name} franchise owner. You can switch back anytime from the banner at the top.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', 'Failed to switch to franchise view. Please try again.');
+      }
+    } catch (error) {
+      console.error('View as franchise error:', error);
+      Alert.alert('Error', 'Failed to switch to franchise view. Please try again.');
+    }
+  };
+
+  const handleActionSheetResponse = (franchise: any, buttonIndex: number) => {
     switch (buttonIndex) {
       case 0:
-        router.push(`/franchise/${product.id}`);
+        router.push(`/franchise/${franchise.id}`);
         break;
       case 1:
-        router.push(`/franchise/add/${product.id}`);
+        router.push(`/franchise/add/${franchise.id}`);
         break;
       case 2:
-        updateFranchiseStatus(product.id, !product.isActive);
+        handleViewAsFranchise(franchise);
+        break;
+      case 3:
+        updateFranchiseStatus(franchise.id, franchise.status !== 'Active');
         break;
     }
   };
@@ -215,19 +241,6 @@ const FranchiseScreen = () => {
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        {/* Revenue Summary Card */}
-        {/* <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <View style={styles.summaryIcon}>
-              <MaterialIcons name="trending-up" size={24} color="#FFFFFF" />
-            </View>
-            <View style={styles.summaryDetails}>
-              <Text style={styles.summaryTitle}>Total Revenue</Text>
-              <Text style={styles.summaryValue}>₹{(totalRevenue / 100000).toFixed(1)}L</Text>
-            </View>
-          </View>
-        </View> */}
 
         {filteredFranchises.length === 0 ? (
           <View style={styles.emptyState}>
@@ -319,7 +332,16 @@ const FranchiseScreen = () => {
                   </View>
                 </View>
 
-
+                {/* View As Button */}
+                <View style={styles.actionButtonsRow}>
+                  <TouchableOpacity 
+                    style={styles.viewAsButton}
+                    onPress={() => handleViewAsFranchise(item)}
+                  >
+                    <Ionicons name="eye" size={16} color="#3B82F6" />
+                    <Text style={styles.viewAsButtonText}>View as Franchise</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </TouchableOpacity>
           ))
@@ -355,8 +377,6 @@ const styles = StyleSheet.create({
   },
   filterContainer: {
     paddingHorizontal: 0,
-    // backgroundColor:'white',
-    // padding:12,
     padding: 2,
     borderRadius: 100,
     gap: 12,
@@ -393,46 +413,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_500Medium',
     color: '#6B7280',
   },
-  summaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  summaryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#10B981',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  summaryDetails: {
-    flex: 1,
-  },
-  summaryTitle: {
-    fontSize: 14,
-    fontFamily: 'Outfit_500Medium',
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontFamily: 'Outfit_700Bold',
-    color: '#111827',
-  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -447,7 +427,7 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     fontFamily: 'Outfit_400Regular',
-    // color: '#9CA3AF',
+    color: '#9CA3AF',
   },
   franchiseCard: {
     backgroundColor: '#FFFFFF',
@@ -557,12 +537,12 @@ const styles = StyleSheet.create({
   companyBadgeText: {
     fontSize: 10,
     fontFamily: 'Outfit_500Medium',
-    // color: '#7C3AED',
+    color: '#7C3AED',
   },
   metricsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   metricBox: {
     alignItems: 'center',
@@ -579,16 +559,26 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
   },
-  employeeRow: {
+  actionButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  viewAsButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
   },
-  employeeText: {
+  viewAsButtonText: {
     fontSize: 12,
-    fontFamily: 'Outfit_500Medium',
-    color: '#6B7280',
-    marginLeft: 4,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#3B82F6',
+    marginLeft: 6,
   },
   fab: {
     position: 'absolute',

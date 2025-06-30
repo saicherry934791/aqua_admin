@@ -43,6 +43,8 @@ export interface ViewAsState {
     currentViewRole: UserRole | null;
     targetFranchiseId?: string;
     targetUserId?: string;
+    targetFranchiseName?: string;
+    targetUserName?: string;
 }
 
 interface AuthContextType {
@@ -57,8 +59,8 @@ interface AuthContextType {
     logout: () => Promise<void>;
 
     // View As functionality
-    viewAsFranchiseOwner: (franchiseId: string) => Promise<boolean>;
-    viewAsServiceAgent: (agentId: string, franchiseId: string) => Promise<boolean>;
+    viewAsFranchiseOwner: (franchiseId: string, franchiseName: string) => Promise<boolean>;
+    viewAsServiceAgent: (agentId: string, agentName: string, franchiseId: string) => Promise<boolean>;
     exitViewAs: () => Promise<void>;
 
     // Permission checking
@@ -239,7 +241,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ]);
     };
 
-    const viewAsFranchiseOwner = async (franchiseId: string): Promise<boolean> => {
+    const viewAsFranchiseOwner = async (franchiseId: string, franchiseName: string): Promise<boolean> => {
         if (!user || user.role !== UserRole.ADMIN) {
             return false;
         }
@@ -261,6 +263,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     originalUser: user,
                     currentViewRole: UserRole.FRANCHISE_OWNER,
                     targetFranchiseId: franchiseId,
+                    targetFranchiseName: franchiseName,
                 };
 
                 setViewAsState(newViewAsState);
@@ -277,7 +280,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return false;
     };
 
-    const viewAsServiceAgent = async (agentId: string, franchiseId: string): Promise<boolean> => {
+    const viewAsServiceAgent = async (agentId: string, agentName: string, franchiseId: string): Promise<boolean> => {
         if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.FRANCHISE_OWNER)) {
             return false;
         }
@@ -299,6 +302,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     currentViewRole: UserRole.SERVICE_AGENT,
                     targetFranchiseId: franchiseId,
                     targetUserId: agentId,
+                    targetUserName: agentName,
                 };
 
                 setViewAsState(newViewAsState);
@@ -367,13 +371,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const canAccessTab = (tabName: string): boolean => {
         if (!user) return false;
 
-        // Define tab access based on roles
+        // Define tab access based on roles - more restrictive filtering
         const tabPermissions: Record<string, UserRole[]> = {
             'index': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Dashboard
-            'manage': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER], // Manage tab
+            'manage': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER], // Manage tab - only admin and franchise
             'orders': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Orders
             'service': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Service requests
-            'notifications': [UserRole.SERVICE_AGENT], // Notifications (Service agents only)
+            'notifications': [UserRole.SERVICE_AGENT], // Notifications - only service agents
             'profile': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Profile
         };
 
