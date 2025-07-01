@@ -14,6 +14,7 @@ import {
     RefreshControl
 } from 'react-native';
 import ActionSheet from 'react-native-actions-sheet';
+import { SheetManager } from 'react-native-actions-sheet';
 
 interface ServiceRequest {
     id: string;
@@ -52,16 +53,13 @@ const ServiceDetailScreen = () => {
     const [updating, setUpdating] = useState(false);
     const actionSheetRef = useRef<ActionSheet>(null);
 
-
-
     const fetchServiceRequest = async () => {
         setLoading(true);
         try {
             const result = await apiService.get(`/service-requests/${id}`);
             if(!result.success){
-                serviceRequest(null)
+                setServiceRequest(null)
                 return
-
             }
             const data = result.data.serviceRequest
             console.log('data came here for sr ',data)
@@ -69,7 +67,7 @@ const ServiceDetailScreen = () => {
                 id: data.id,
                 customerId: data.customer.id,
                 customerName: data.customer.name,
-                customerPhone: data.customer.name,
+                customerPhone: data.customer.phone,
                 customerEmail: data.customer.email,
                 customerAddress: data.customer.address,
                 productId: data.product.id,
@@ -79,7 +77,7 @@ const ServiceDetailScreen = () => {
                 description: data.product.description,
                 status: 'SCHEDULED',
                 assignedToId: data.assignedToId,
-                assignedToName: data.assignedTo?.name || 'N/A',
+                assignedToName: data.assignedTo?.name || null,
                 franchiseAreaId: data.franchiseAreaId,
                 franchiseAreaName: 'Hyderabad Central',
                 scheduledDate: '2024-06-28T10:00:00Z',
@@ -174,7 +172,7 @@ const ServiceDetailScreen = () => {
     };
 
     const handleWhatsApp = (phoneNumber: string) => {
-        const cleanNumber = phoneNumber.replace(/[^\d]/g, '');
+        const cleanNumber = phoneNumber?.replace(/[^\d]/g, '');
         Linking.openURL(`whatsapp://send?phone=${cleanNumber}`);
     };
 
@@ -245,7 +243,49 @@ const ServiceDetailScreen = () => {
             case 'reschedule':
                 Alert.alert('Reschedule', 'Reschedule functionality would be implemented here');
                 break;
+            case 'assign_agent':
+                handleAssignAgent();
+                break;
+            case 'schedule_time':
+                handleScheduleTime();
+                break;
         }
+    };
+
+    const handleAssignAgent = () => {
+        SheetManager.show('agent-assignment-sheet', {
+            payload: {
+                serviceRequestId: id,
+                currentAgentId: serviceRequest?.assignedToId,
+                currentAgentName: serviceRequest?.assignedToName,
+                onAgentAssigned: (agent: { id: string; name: string; phone: string }) => {
+                    if (serviceRequest) {
+                        setServiceRequest({
+                            ...serviceRequest,
+                            assignedToId: agent.id || undefined,
+                            assignedToName: agent.name || undefined,
+                        });
+                    }
+                }
+            }
+        });
+    };
+
+    const handleScheduleTime = () => {
+        SheetManager.show('schedule-time-sheet', {
+            payload: {
+                serviceRequestId: id,
+                currentScheduledDate: serviceRequest?.scheduledDate,
+                onScheduleUpdated: (scheduledDate: string | null) => {
+                    if (serviceRequest) {
+                        setServiceRequest({
+                            ...serviceRequest,
+                            scheduledDate: scheduledDate || undefined,
+                        });
+                    }
+                }
+            }
+        });
     };
 
     const getAvailableActions = () => {
@@ -256,20 +296,25 @@ const ServiceDetailScreen = () => {
         switch (currentStatus) {
             case 'CREATED':
                 return [
-                    { key: 'assign', title: 'Assign to Technician', icon: 'person-add' },
-                    { key: 'schedule', title: 'Schedule Service', icon: 'calendar' },
+                    { key: 'assign_agent', title: 'Assign Agent', icon: 'person-add' },
+                    { key: 'schedule_time', title: 'Schedule Time', icon: 'calendar' },
+                    { key: 'assign', title: 'Mark as Assigned', icon: 'person-add' },
+                    { key: 'schedule', title: 'Mark as Scheduled', icon: 'calendar' },
                     { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case 'ASSIGNED':
                 return [
-                    { key: 'schedule', title: 'Schedule Service', icon: 'calendar' },
+                    { key: 'assign_agent', title: 'Reassign Agent', icon: 'person-add' },
+                    { key: 'schedule_time', title: 'Schedule Time', icon: 'calendar' },
+                    { key: 'schedule', title: 'Mark as Scheduled', icon: 'calendar' },
                     { key: 'start', title: 'Start Service', icon: 'play' },
                     { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case 'SCHEDULED':
                 return [
+                    { key: 'assign_agent', title: 'Reassign Agent', icon: 'person-add' },
+                    { key: 'schedule_time', title: 'Reschedule Time', icon: 'calendar' },
                     { key: 'start', title: 'Start Service', icon: 'play' },
-                    { key: 'reschedule', title: 'Reschedule', icon: 'calendar' },
                     { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case 'IN_PROGRESS':
@@ -449,19 +494,19 @@ const ServiceDetailScreen = () => {
                             </View>
                         )}
 
-                        {/* {serviceRequest.estimatedDuration && (
+                        {serviceRequest.estimatedDuration && (
                             <View style={styles.detailItem}>
                                 <Text style={styles.detailLabel}>Estimated Duration</Text>
                                 <Text style={styles.detailValue}>{serviceRequest.estimatedDuration} minutes</Text>
                             </View>
-                        )} */}
+                        )}
 
-                        {/* {serviceRequest.cost && (
+                        {serviceRequest.cost && (
                             <View style={styles.detailItem}>
                                 <Text style={styles.detailLabel}>Service Cost</Text>
                                 <Text style={styles.detailValue}>₹{serviceRequest.cost.toLocaleString()}</Text>
                             </View>
-                        )} */}
+                        )}
                     </View>
                 </View>
 
@@ -506,7 +551,7 @@ const ServiceDetailScreen = () => {
                     </View>
                 </View>
 
-                {/* Materials
+                {/* Materials */}
                 {serviceRequest.materials && serviceRequest.materials.length > 0 && (
                     <View style={styles.sectionCard}>
                         <Text style={styles.sectionTitle}>Required Materials</Text>
@@ -518,15 +563,15 @@ const ServiceDetailScreen = () => {
                             ))}
                         </View>
                     </View>
-                )} */}
+                )}
 
-                {/* Notes
+                {/* Notes */}
                 {serviceRequest.notes && (
                     <View style={styles.sectionCard}>
                         <Text style={styles.sectionTitle}>Notes</Text>
                         <Text style={styles.notesText}>{serviceRequest.notes}</Text>
                     </View>
-                )} */}
+                )}
 
                 <View style={styles.bottomPadding} />
             </ScrollView>
