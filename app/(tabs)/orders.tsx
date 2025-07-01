@@ -7,21 +7,22 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-type FilterType = 'all' | 'created' | 'confirmed' | 'in_progress' | 'delivered' | 'completed' | 'cancelled';
-type OrderTypeFilter = 'all' | 'rent' | 'buy';
+type FilterType = 'all' | 'created' | 'payment_pending' | 'payment_completed' | 'assigned' | 'installation_pending' | 'installed' | 'completed' | 'cancelled';
+type OrderTypeFilter = 'all' | 'rent' | 'purchase';
 
 interface Order {
   id: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
+  customerEmail?: string;
   productId: string;
   productName: string;
   productImage?: string;
-  type: 'RENT' | 'BUY';
-  status: 'CREATED' | 'CONFIRMED' | 'IN_PROGRESS' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED';
+  type: 'rent' | 'purchase';
+  status: 'created' | 'payment_pending' | 'payment_completed' | 'assigned' | 'installation_pending' | 'installed' | 'cancelled' | 'completed';
   totalAmount: number;
-  paymentStatus: 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED' | 'PARTIAL';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' | 'partial';
   serviceAgentId?: string;
   serviceAgentName?: string;
   installationDate?: string;
@@ -40,111 +41,34 @@ const OrdersScreen = () => {
     setLoading(true);
     try {
       const result = await apiService.get('/orders');
-      console.log('Orders API response:', result);
-      
-      if (result.success && result.data && Array.isArray(result.data)) {
+      console.log('Orders API response:', JSON.stringify(result));
+
+      if (result.success && result.data && Array.isArray(result.data.orders)) {
         // Map the API response to our Order interface
-        const mappedOrders: Order[] = result.data.map((item: any) => ({
+        const mappedOrders: Order[] = result.data.orders.map((item: any) => ({
           id: item.id || item._id || Date.now().toString(),
           customerId: item.customerId || item.customer_id || '',
-          customerName: item.customerName || item.customer_name || 'Unknown Customer',
-          customerPhone: item.customerPhone || item.customer_phone || '',
+          customerName: item.customer?.name || item.customerName || item.customer_name || 'Unknown Customer',
+          customerPhone: item.customer?.phone || item.customerPhone || item.customer_phone || '',
+          customerEmail: item.customer?.email || item.customerEmail || item.customer_email,
           productId: item.productId || item.product_id || '',
-          productName: item.productName || item.product_name || 'Unknown Product',
-          productImage: item.productImage || item.product_image,
-          type: (item.type || item.order_type || 'BUY').toUpperCase() as 'RENT' | 'BUY',
-          status: (item.status || 'CREATED').toUpperCase() as Order['status'],
+          productName: item.product?.name || item.productName || item.product_name || 'Unknown Product',
+          productImage: item.product?.images?.[0] || item.productImage || item.product_image,
+          type: (item.type || item.order_type || 'purchase').toLowerCase() as 'rent' | 'purchase',
+          status: (item.status || 'created').toLowerCase() as Order['status'],
           totalAmount: item.totalAmount || item.total_amount || 0,
-          paymentStatus: (item.paymentStatus || item.payment_status || 'PENDING').toUpperCase() as Order['paymentStatus'],
-          serviceAgentId: item.serviceAgentId || item.service_agent_id,
-          serviceAgentName: item.serviceAgentName || item.service_agent_name,
+          paymentStatus: (item.paymentStatus || item.payment_status || 'pending').toLowerCase() as Order['paymentStatus'],
+          serviceAgentId: item.serviceAgentId || item.service_agent_id || item.serviceAgent?.id,
+          serviceAgentName: item.serviceAgent?.name || item.serviceAgentName || item.service_agent_name,
           installationDate: item.installationDate || item.installation_date,
           createdAt: item.createdAt || item.created_at || new Date().toISOString(),
           updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
         }));
-        
+
         setOrders(mappedOrders);
       } else {
-        // Fallback to mock data if API doesn't return data
-        setOrders([
-          {
-            id: 'order-1',
-            customerId: 'cust-1',
-            customerName: 'Ravi Teja',
-            customerPhone: '+91 9876543210',
-            productId: 'prod-1',
-            productName: 'RO Water Purifier Premium',
-            type: 'RENT',
-            status: 'CONFIRMED',
-            totalAmount: 2500,
-            paymentStatus: 'PAID',
-            serviceAgentId: 'agent-1',
-            serviceAgentName: 'Kumar Singh',
-            installationDate: '2024-06-28',
-            createdAt: '2024-06-25T10:30:00Z',
-            updatedAt: '2024-06-25T15:45:00Z',
-          },
-          {
-            id: 'order-2',
-            customerId: 'cust-2',
-            customerName: 'Priya Sharma',
-            customerPhone: '+91 9988776655',
-            productId: 'prod-2',
-            productName: 'UV Water Purifier Basic',
-            type: 'BUY',
-            status: 'DELIVERED',
-            totalAmount: 15000,
-            paymentStatus: 'PAID',
-            serviceAgentId: 'agent-2',
-            serviceAgentName: 'Raj Patel',
-            installationDate: '2024-06-24',
-            createdAt: '2024-06-20T09:15:00Z',
-            updatedAt: '2024-06-24T16:20:00Z',
-          },
-          {
-            id: 'order-3',
-            customerId: 'cust-3',
-            customerName: 'Arjun Kumar',
-            customerPhone: '+91 8877665544',
-            productId: 'prod-3',
-            productName: 'Alkaline Water Purifier',
-            type: 'RENT',
-            status: 'IN_PROGRESS',
-            totalAmount: 3000,
-            paymentStatus: 'PENDING',
-            installationDate: '2024-06-27',
-            createdAt: '2024-06-24T14:20:00Z',
-            updatedAt: '2024-06-26T11:30:00Z',
-          },
-          {
-            id: 'order-4',
-            customerId: 'cust-4',
-            customerName: 'Sita Ram',
-            customerPhone: '+91 7766554433',
-            productId: 'prod-4',
-            productName: 'Smart RO System',
-            type: 'BUY',
-            status: 'CREATED',
-            totalAmount: 25000,
-            paymentStatus: 'PENDING',
-            createdAt: '2024-06-26T16:45:00Z',
-            updatedAt: '2024-06-26T16:45:00Z',
-          },
-          {
-            id: 'order-5',
-            customerId: 'cust-5',
-            customerName: 'Lakshmi Devi',
-            customerPhone: '+91 6655443322',
-            productId: 'prod-5',
-            productName: 'Compact Water Purifier',
-            type: 'RENT',
-            status: 'CANCELLED',
-            totalAmount: 2000,
-            paymentStatus: 'REFUNDED',
-            createdAt: '2024-06-22T12:00:00Z',
-            updatedAt: '2024-06-23T09:30:00Z',
-          },
-        ]);
+        // Fallback to empty array if API doesn't return data
+        setOrders([]);
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -169,17 +93,19 @@ const OrdersScreen = () => {
   }, []);
 
   // Calculate statistics
-  const createdOrders = orders.filter(o => o.status === 'CREATED').length;
-  const confirmedOrders = orders.filter(o => o.status === 'CONFIRMED').length;
-  const inProgressOrders = orders.filter(o => o.status === 'IN_PROGRESS').length;
-  const deliveredOrders = orders.filter(o => o.status === 'DELIVERED').length;
-  const completedOrders = orders.filter(o => o.status === 'COMPLETED').length;
-  const cancelledOrders = orders.filter(o => o.status === 'CANCELLED').length;
+  const createdOrders = orders.filter(o => o.status === 'created').length;
+  const paymentPendingOrders = orders.filter(o => o.status === 'payment_pending').length;
+  const paymentCompletedOrders = orders.filter(o => o.status === 'payment_completed').length;
+  const assignedOrders = orders.filter(o => o.status === 'assigned').length;
+  const installationPendingOrders = orders.filter(o => o.status === 'installation_pending').length;
+  const installedOrders = orders.filter(o => o.status === 'installed').length;
+  const completedOrders = orders.filter(o => o.status === 'completed').length;
+  const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
 
   // Filter orders based on active filters
   const filteredOrders = orders.filter(order => {
-    const statusMatch = activeFilter === 'all' || order.status.toLowerCase() === activeFilter;
-    const typeMatch = typeFilter === 'all' || order.type.toLowerCase() === typeFilter;
+    const statusMatch = activeFilter === 'all' || order.status === activeFilter;
+    const typeMatch = typeFilter === 'all' || order.type === typeFilter;
     return statusMatch && typeMatch;
   });
 
@@ -187,10 +113,12 @@ const OrdersScreen = () => {
   const statusFilters = [
     { key: 'all', icon: 'list', label: 'All', value: orders.length, color: '#3B82F6', bgColor: '#EEF2FF' },
     { key: 'created', icon: 'add-circle', label: 'Created', value: createdOrders, color: '#6B7280', bgColor: '#F9FAFB' },
-    { key: 'confirmed', icon: 'checkmark-circle', label: 'Confirmed', value: confirmedOrders, color: '#10B981', bgColor: '#ECFDF5' },
-    { key: 'in_progress', icon: 'time', label: 'In Progress', value: inProgressOrders, color: '#F59E0B', bgColor: '#FFFBEB' },
-    { key: 'delivered', icon: 'car', label: 'Delivered', value: deliveredOrders, color: '#8B5CF6', bgColor: '#F3E8FF' },
-    { key: 'completed', icon: 'checkmark-done', label: 'Completed', value: completedOrders, color: '#059669', bgColor: '#D1FAE5' },
+    { key: 'payment_pending', icon: 'card', label: 'Payment Pending', value: paymentPendingOrders, color: '#F59E0B', bgColor: '#FFFBEB' },
+    { key: 'payment_completed', icon: 'checkmark-circle', label: 'Payment Done', value: paymentCompletedOrders, color: '#10B981', bgColor: '#ECFDF5' },
+    { key: 'assigned', icon: 'person-add', label: 'Assigned', value: assignedOrders, color: '#8B5CF6', bgColor: '#F3E8FF' },
+    { key: 'installation_pending', icon: 'time', label: 'Installation Pending', value: installationPendingOrders, color: '#F59E0B', bgColor: '#FFFBEB' },
+    { key: 'installed', icon: 'checkmark-done', label: 'Installed', value: installedOrders, color: '#059669', bgColor: '#D1FAE5' },
+    { key: 'completed', icon: 'checkmark-done-circle', label: 'Completed', value: completedOrders, color: '#059669', bgColor: '#D1FAE5' },
     { key: 'cancelled', icon: 'close-circle', label: 'Cancelled', value: cancelledOrders, color: '#EF4444', bgColor: '#FEF2F2' },
   ];
 
@@ -198,28 +126,30 @@ const OrdersScreen = () => {
   const typeFilters = [
     { key: 'all', label: 'All Types', color: '#3B82F6' },
     { key: 'rent', label: 'Rental', color: '#10B981' },
-    { key: 'buy', label: 'Purchase', color: '#F59E0B' },
+    { key: 'purchase', label: 'Purchase', color: '#F59E0B' },
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'CREATED': return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
-      case 'CONFIRMED': return { bg: '#ECFDF5', text: '#047857', dot: '#10B981' };
-      case 'IN_PROGRESS': return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
-      case 'DELIVERED': return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6' };
-      case 'COMPLETED': return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
-      case 'CANCELLED': return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444' };
+      case 'created': return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
+      case 'payment_pending': return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
+      case 'payment_completed': return { bg: '#ECFDF5', text: '#047857', dot: '#10B981' };
+      case 'assigned': return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6' };
+      case 'installation_pending': return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
+      case 'installed': return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
+      case 'completed': return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
+      case 'cancelled': return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444' };
       default: return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
     }
   };
 
   const getPaymentStatusColor = (status: string) => {
     switch (status) {
-      case 'PAID': return { bg: '#ECFDF5', text: '#047857' };
-      case 'PENDING': return { bg: '#FFFBEB', text: '#92400E' };
-      case 'FAILED': return { bg: '#FEF2F2', text: '#DC2626' };
-      case 'REFUNDED': return { bg: '#F3E8FF', text: '#6B21A8' };
-      case 'PARTIAL': return { bg: '#FEF3C7', text: '#92400E' };
+      case 'paid': return { bg: '#ECFDF5', text: '#047857' };
+      case 'pending': return { bg: '#FFFBEB', text: '#92400E' };
+      case 'failed': return { bg: '#FEF2F2', text: '#DC2626' };
+      case 'refunded': return { bg: '#F3E8FF', text: '#6B21A8' };
+      case 'partial': return { bg: '#FEF3C7', text: '#92400E' };
       default: return { bg: '#F9FAFB', text: '#6B7280' };
     }
   };
@@ -234,6 +164,10 @@ const OrdersScreen = () => {
       month: 'short',
       year: 'numeric'
     });
+  };
+
+  const getStatusDisplayText = (status: string) => {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   return (
@@ -338,12 +272,12 @@ const OrdersScreen = () => {
                     <View style={styles.orderTitleRow}>
                       <Text style={styles.orderId}>#{order.id.slice(-6).toUpperCase()}</Text>
                       <View style={[styles.orderTypeBadge, {
-                        backgroundColor: order.type === 'RENT' ? '#ECFDF5' : '#FFFBEB'
+                        backgroundColor: order.type === 'rent' ? '#ECFDF5' : '#FFFBEB'
                       }]}>
                         <Text style={[styles.orderTypeText, {
-                          color: order.type === 'RENT' ? '#047857' : '#92400E'
+                          color: order.type === 'rent' ? '#047857' : '#92400E'
                         }]}>
-                          {order.type === 'RENT' ? 'Rental' : 'Purchase'}
+                          {order.type === 'rent' ? 'Rental' : 'Purchase'}
                         </Text>
                       </View>
                     </View>
@@ -365,12 +299,12 @@ const OrdersScreen = () => {
                     <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
                       <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
                       <Text style={[styles.statusText, { color: statusColors.text }]}>
-                        {order.status.replace('_', ' ')}
+                        {getStatusDisplayText(order.status)}
                       </Text>
                     </View>
                     <View style={[styles.paymentBadge, { backgroundColor: paymentColors.bg }]}>
                       <Text style={[styles.paymentText, { color: paymentColors.text }]}>
-                        {order.paymentStatus}
+                        {order.paymentStatus.toUpperCase()}
                       </Text>
                     </View>
                   </View>

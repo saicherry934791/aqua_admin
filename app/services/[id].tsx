@@ -52,42 +52,49 @@ const ServiceDetailScreen = () => {
     const [updating, setUpdating] = useState(false);
     const actionSheetRef = useRef<ActionSheet>(null);
 
-    // Mock data for demonstration
-    const mockServiceRequest: ServiceRequest = {
-        id: 'sr-1',
-        customerId: 'cust-1',
-        customerName: 'Ravi Teja',
-        customerPhone: '+91 9876543210',
-        customerEmail: 'ravi.teja@email.com',
-        customerAddress: '123, Brigade Road, Hyderabad, Telangana - 500001',
-        productId: 'prod-1',
-        productName: 'RO Water Purifier Premium',
-        orderId: 'order-1',
-        type: 'INSTALLATION',
-        description: 'New installation required for RO water purifier. Customer prefers morning slot between 10 AM to 12 PM. Ground floor installation with direct water connection available.',
-        status: 'SCHEDULED',
-        assignedToId: 'agent-1',
-        assignedToName: 'Kumar Singh',
-        franchiseAreaId: 'area-1',
-        franchiseAreaName: 'Hyderabad Central',
-        scheduledDate: '2024-06-28T10:00:00Z',
-        createdAt: '2024-06-25T10:30:00Z',
-        updatedAt: '2024-06-26T15:45:00Z',
-        priority: 'HIGH',
-        notes: 'Customer requested morning slot. Ensure to carry all necessary tools and spare parts.',
-        estimatedDuration: 120,
-        materials: ['RO Membrane', 'Pre-filters', 'Tubing', 'Fittings'],
-        cost: 15000
-    };
+
 
     const fetchServiceRequest = async () => {
         setLoading(true);
         try {
-            // const result = await apiService.get(`/service-requests/${id}`);
-            // setServiceRequest(result?.data || null);
+            const result = await apiService.get(`/service-requests/${id}`);
+            if(!result.success){
+                serviceRequest(null)
+                return
 
+            }
+            const data = result.data.serviceRequest
+            console.log('data came here for sr ',data)
+            setServiceRequest({
+                id: data.id,
+                customerId: data.customer.id,
+                customerName: data.customer.name,
+                customerPhone: data.customer.name,
+                customerEmail: data.customer.email,
+                customerAddress: data.customer.address,
+                productId: data.product.id,
+                productName: data.product.name,
+                orderId: data.orderId,
+                type: data.type,
+                description: data.product.description,
+                status: 'SCHEDULED',
+                assignedToId: data.assignedToId,
+                assignedToName: data.assignedTo?.name || 'N/A',
+                franchiseAreaId: data.franchiseAreaId,
+                franchiseAreaName: 'Hyderabad Central',
+                scheduledDate: '2024-06-28T10:00:00Z',
+                createdAt: data.createdAt,
+                updatedAt: '2024-06-26T15:45:00Z',
+                priority: 'HIGH',
+                notes: 'Customer requested morning slot. Ensure to carry all necessary tools and spare parts.',
+                estimatedDuration: 120,
+                materials: ['RO Membrane', 'Pre-filters', 'Tubing', 'Fittings'],
+                cost: 15000
+            });
+
+            console.log('service request is ', JSON.stringify(result.data.serviceRequest))
             // Using mock data for now
-            setServiceRequest(mockServiceRequest);
+            // setServiceRequest(mockServiceRequest);
         } catch (error) {
             console.error('Failed to fetch service request:', error);
             Alert.alert('Error', 'Failed to load service request details');
@@ -205,7 +212,7 @@ const ServiceDetailScreen = () => {
 
     const handleActionPress = (action: string) => {
         actionSheetRef.current?.hide();
-        
+
         switch (action) {
             case 'assign':
                 updateServiceStatus('ASSIGNED');
@@ -245,7 +252,7 @@ const ServiceDetailScreen = () => {
         if (!serviceRequest) return [];
 
         const currentStatus = serviceRequest.status;
-        
+
         switch (currentStatus) {
             case 'CREATED':
                 return [
@@ -442,19 +449,19 @@ const ServiceDetailScreen = () => {
                             </View>
                         )}
 
-                        {serviceRequest.estimatedDuration && (
+                        {/* {serviceRequest.estimatedDuration && (
                             <View style={styles.detailItem}>
                                 <Text style={styles.detailLabel}>Estimated Duration</Text>
                                 <Text style={styles.detailValue}>{serviceRequest.estimatedDuration} minutes</Text>
                             </View>
-                        )}
+                        )} */}
 
-                        {serviceRequest.cost && (
+                        {/* {serviceRequest.cost && (
                             <View style={styles.detailItem}>
                                 <Text style={styles.detailLabel}>Service Cost</Text>
                                 <Text style={styles.detailValue}>₹{serviceRequest.cost.toLocaleString()}</Text>
                             </View>
-                        )}
+                        )} */}
                     </View>
                 </View>
 
@@ -499,7 +506,7 @@ const ServiceDetailScreen = () => {
                     </View>
                 </View>
 
-                {/* Materials */}
+                {/* Materials
                 {serviceRequest.materials && serviceRequest.materials.length > 0 && (
                     <View style={styles.sectionCard}>
                         <Text style={styles.sectionTitle}>Required Materials</Text>
@@ -511,15 +518,15 @@ const ServiceDetailScreen = () => {
                             ))}
                         </View>
                     </View>
-                )}
+                )} */}
 
-                {/* Notes */}
+                {/* Notes
                 {serviceRequest.notes && (
                     <View style={styles.sectionCard}>
                         <Text style={styles.sectionTitle}>Notes</Text>
                         <Text style={styles.notesText}>{serviceRequest.notes}</Text>
                     </View>
-                )}
+                )} */}
 
                 <View style={styles.bottomPadding} />
             </ScrollView>

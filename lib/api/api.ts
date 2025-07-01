@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.31.180:3000/api';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.73.216:3000/api';
 
 export interface ApiResponse<T = any> {
   success: boolean;

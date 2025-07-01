@@ -44,125 +44,11 @@ const ServiceRequestsScreen = () => {
         setLoading(true);
         try {
             const result = await apiService.get('/service-requests');
-            const data = result?.data || [];
+
+            console.log('service requests are ',JSON.stringify(result.data?.serviceRequests))
+            const data = result?.data?.serviceRequests || [];
             if (!data || data.length === 0) {
-                setServiceRequests([
-                    {
-                        id: 'sr-1',
-                        customerId: 'cust-1',
-                        customerName: 'Ravi Teja',
-                        customerPhone: '+91 9876543210',
-                        customerAddress: 'Hyderabad, Telangana',
-                        productId: 'prod-1',
-                        productName: 'RO Water Purifier Premium',
-                        orderId: 'order-1',
-                        type: 'INSTALLATION',
-                        description: 'New installation required for RO water purifier. Customer prefers morning slot.',
-                        status: 'SCHEDULED',
-                        assignedToId: 'agent-1',
-                        assignedToName: 'Kumar Singh',
-                        franchiseAreaId: 'area-1',
-                        franchiseAreaName: 'Hyderabad Central',
-                        scheduledDate: '2024-06-28T10:00:00Z',
-                        createdAt: '2024-06-25T10:30:00Z',
-                        updatedAt: '2024-06-26T15:45:00Z',
-                        priority: 'HIGH',
-                    },
-                    {
-                        id: 'sr-2',
-                        customerId: 'cust-2',
-                        customerName: 'Priya Sharma',
-                        customerPhone: '+91 9988776655',
-                        customerAddress: 'Mumbai, Maharashtra',
-                        productId: 'prod-2',
-                        productName: 'UV Water Purifier Basic',
-                        type: 'MAINTENANCE',
-                        description: 'Regular maintenance and filter replacement needed. Customer reports slow water flow.',
-                        status: 'ASSIGNED',
-                        assignedToId: 'agent-2',
-                        assignedToName: 'Raj Patel',
-                        franchiseAreaId: 'area-2',
-                        franchiseAreaName: 'Mumbai West',
-                        createdAt: '2024-06-24T09:15:00Z',
-                        updatedAt: '2024-06-25T16:20:00Z',
-                        priority: 'MEDIUM',
-                    },
-                    {
-                        id: 'sr-3',
-                        customerId: 'cust-3',
-                        customerName: 'Arjun Kumar',
-                        customerPhone: '+91 8877665544',
-                        customerAddress: 'Chennai, Tamil Nadu',
-                        productId: 'prod-3',
-                        productName: 'Alkaline Water Purifier',
-                        type: 'REPAIR',
-                        description: 'Water purifier not working. Display shows error code E3. Urgent repair needed.',
-                        status: 'IN_PROGRESS',
-                        assignedToId: 'agent-3',
-                        assignedToName: 'Suresh Kumar',
-                        franchiseAreaId: 'area-3',
-                        franchiseAreaName: 'Chennai North',
-                        scheduledDate: '2024-06-27T14:00:00Z',
-                        createdAt: '2024-06-24T14:20:00Z',
-                        updatedAt: '2024-06-27T11:30:00Z',
-                        priority: 'URGENT',
-                    },
-                    {
-                        id: 'sr-4',
-                        customerId: 'cust-4',
-                        customerName: 'Sita Ram',
-                        customerPhone: '+91 7766554433',
-                        customerAddress: 'Bangalore, Karnataka',
-                        productId: 'prod-4',
-                        productName: 'Smart RO System',
-                        type: 'REPLACEMENT',
-                        description: 'Faulty membrane needs replacement. Under warranty period.',
-                        status: 'CREATED',
-                        franchiseAreaId: 'area-4',
-                        franchiseAreaName: 'Bangalore South',
-                        createdAt: '2024-06-26T16:45:00Z',
-                        updatedAt: '2024-06-26T16:45:00Z',
-                        priority: 'LOW',
-                    },
-                    {
-                        id: 'sr-5',
-                        customerId: 'cust-5',
-                        customerName: 'Lakshmi Devi',
-                        customerPhone: '+91 6655443322',
-                        customerAddress: 'Pune, Maharashtra',
-                        productId: 'prod-5',
-                        productName: 'Compact Water Purifier',
-                        type: 'MAINTENANCE',
-                        description: 'Annual maintenance service completed successfully. All filters replaced.',
-                        status: 'COMPLETED',
-                        assignedToId: 'agent-4',
-                        assignedToName: 'Amit Sharma',
-                        franchiseAreaId: 'area-5',
-                        franchiseAreaName: 'Pune East',
-                        scheduledDate: '2024-06-20T11:00:00Z',
-                        completedDate: '2024-06-20T13:30:00Z',
-                        createdAt: '2024-06-18T12:00:00Z',
-                        updatedAt: '2024-06-20T13:30:00Z',
-                        priority: 'LOW',
-                    },
-                    {
-                        id: 'sr-6',
-                        customerId: 'cust-6',
-                        customerName: 'Ramesh Gupta',
-                        customerPhone: '+91 5544332211',
-                        customerAddress: 'Delhi, NCR',
-                        productId: 'prod-6',
-                        productName: 'Industrial RO Plant',
-                        type: 'INSTALLATION',
-                        description: 'Customer cancelled the installation due to change in requirements.',
-                        status: 'CANCELLED',
-                        franchiseAreaId: 'area-6',
-                        franchiseAreaName: 'Delhi Central',
-                        createdAt: '2024-06-22T08:00:00Z',
-                        updatedAt: '2024-06-23T09:30:00Z',
-                        priority: 'MEDIUM',
-                    },
-                ]);
+                setServiceRequests([]);
             } else {
                 setServiceRequests(data);
             }
@@ -404,15 +290,15 @@ const ServiceRequestsScreen = () => {
                                 <View style={styles.customerSection}>
                                     <View style={styles.customerRow}>
                                         <Ionicons name="person" size={12} color="#6B7280" />
-                                        <Text style={styles.customerName}>{request.customerName}</Text>
+                                        <Text style={styles.customerName}>{request.customer.name}</Text>
                                     </View>
                                     <View style={styles.customerRow}>
                                         <Ionicons name="call" size={12} color="#6B7280" />
-                                        <Text style={styles.customerPhone}>{request.customerPhone}</Text>
+                                        <Text style={styles.customerPhone}>{request.customer.phone}</Text>
                                     </View>
                                     <View style={styles.customerRow}>
                                         <Ionicons name="location" size={12} color="#6B7280" />
-                                        <Text style={styles.customerAddress} numberOfLines={1}>{request.customerAddress}</Text>
+                                        <Text style={styles.customerAddress} numberOfLines={1}>{request.customer.address}</Text>
                                     </View>
                                 </View>
 
