@@ -212,6 +212,7 @@ export default function DashboardScreen() {
   const renderDashboardContent = () => {
     const userRole = user?.role;
 
+    console.log('not access ',user)
     if (userRole === UserRole.ADMIN) {
       return renderAdminContent();
     } else if (userRole === UserRole.FRANCHISE_OWNER) {

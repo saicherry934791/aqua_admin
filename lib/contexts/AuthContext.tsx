@@ -369,10 +369,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const refreshUser = async () => {
         try {
             const response = await apiService.get('/auth/me');
+            console.log('response in auth me ',response)
             if (response.success) {
                 // Only update if not in view-as mode
                 if (!viewAsState.isViewingAs) {
-                    setUser(response.data);
+                    setUser(response.data.user);
                     await AsyncStorage.setItem('userProfile', JSON.stringify(response.data));
                 }
             }
