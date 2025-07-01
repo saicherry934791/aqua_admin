@@ -2,7 +2,7 @@ import { apiService } from '@/lib/api/api';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
@@ -15,6 +15,31 @@ const AgentScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
     const { user, viewAsServiceAgent } = useAuth();
+    const { refreshData } = useLocalSearchParams();
+
+    // Handle refresh data from form submissions
+    useEffect(() => {
+        if (refreshData) {
+            try {
+                const parsedData = JSON.parse(refreshData as string);
+                if (parsedData.type === 'add') {
+                    // Add new agent to the list
+                    setAgents(prev => [parsedData.data, ...prev]);
+                } else if (parsedData.type === 'update') {
+                    // Update existing agent in the list
+                    setAgents(prev => 
+                        prev.map(agent => 
+                            agent.id === parsedData.data.id ? parsedData.data : agent
+                        )
+                    );
+                }
+                // Clear the refresh data parameter
+                router.setParams({ refreshData: undefined });
+            } catch (error) {
+                console.error('Error parsing refresh data:', error);
+            }
+        }
+    }, [refreshData]);
 
     const fetchAgents = async () => {
         try {

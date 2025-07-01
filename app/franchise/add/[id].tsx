@@ -45,40 +45,72 @@ const FranchiseFormScreen = () => {
 
     const handleSubmit = async (values: any) => {
         try {
-
-        
             const payload = {
                 name: values.franchise_info.franchise_name,
                 city: values.franchise_info.city_name,
                 phoneNumber: values.franchise_info.phone_number,
                 geoPolygon: values.franchise_info.franchise_polygon.coordinates,
-
             }
 
-
+            let result;
+            let newFranchiseData;
 
             if (isNew) {
-                const result = await apiService.post('/franchises', payload);
-
+                result = await apiService.post('/franchises', payload);
                 if (!result.success) {
                     throw new Error('Unable to add Franchise')
                 }
-
+                // Create the new franchise data to pass back
+                newFranchiseData = {
+                    id: result.data.id || Date.now().toString(),
+                    name: payload.name,
+                    location: payload.city,
+                    owner: 'Owned By Company',
+                    revenue: '₹0',
+                    year: new Date().getFullYear(),
+                    outlets: 0,
+                    employees: 0,
+                    status: 'Active',
+                    geoPolygon: payload.geoPolygon,
+                    isCompanyManaged: true,
+                };
             } else {
-                // await fetch(`/franchises/${id}`, {
-                //     method: "PUT",
-                //     headers: { "Content-Type": "application/json" },
-                //     body: JSON.stringify(payload),
-                // })
-                const result = await apiService.patch(`/franchises/${id}`, payload)
+                result = await apiService.patch(`/franchises/${id}`, payload)
                 if (!result.success) {
                     throw new Error('Unable to Update Franchise')
                 }
-
+                // Create the updated franchise data to pass back
+                newFranchiseData = {
+                    id: id,
+                    name: payload.name,
+                    location: payload.city,
+                    owner: 'Owned By Company',
+                    revenue: '₹0',
+                    year: new Date().getFullYear(),
+                    outlets: 0,
+                    employees: 0,
+                    status: 'Active',
+                    geoPolygon: payload.geoPolygon,
+                    isCompanyManaged: true,
+                };
             }
 
             Alert.alert("Success", `Franchise ${isNew ? "created" : "updated"} successfully`)
-            router.back()
+            
+            // Navigate back with the new/updated data
+            if (router.canGoBack()) {
+                router.back();
+                // Use a timeout to ensure navigation completes before sending data
+                setTimeout(() => {
+                    // This will trigger a refresh in the list screen
+                    router.setParams({ 
+                        refreshData: JSON.stringify({
+                            type: isNew ? 'add' : 'update',
+                            data: newFranchiseData
+                        })
+                    });
+                }, 100);
+            }
         } catch (error: any) {
             Alert.alert("Error", error.message || "Failed to submit the form")
         }

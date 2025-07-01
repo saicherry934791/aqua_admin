@@ -44,7 +44,6 @@ const AgentFormScreen = () => {
         try {
             const response = await apiService.get(`/agents?id=${id}`)
 
-     
             if (response.success && response.data) {
                 const data = response.data[0]
                 console.log('response in getting agent ',data)
@@ -90,8 +89,38 @@ const AgentFormScreen = () => {
                 throw new Error(response.message || "Failed to save agent")
             }
 
+            // Create the new/updated agent data to pass back
+            const franchiseName = franchises.find(f => f.id.toString() === payload.franchiseId)?.name || 'Global Agent';
+            const newAgentData = {
+                id: response.data?.id || id || Date.now().toString(),
+                name: payload.name,
+                email: payload.email,
+                phone: payload.number,
+                isActive: true,
+                franchise: franchiseName,
+                franchiseId: payload.franchiseId,
+                createdAt: new Date().toISOString(),
+                joinDate: new Date(),
+                serviceRequestsCount: 0,
+                ordersCount: 0
+            };
+
             Alert.alert("Success", `Agent ${isNew ? "created" : "updated"} successfully`)
-            router.back()
+            
+            // Navigate back with the new/updated data
+            if (router.canGoBack()) {
+                router.back();
+                // Use a timeout to ensure navigation completes before sending data
+                setTimeout(() => {
+                    // This will trigger a refresh in the list screen
+                    router.setParams({ 
+                        refreshData: JSON.stringify({
+                            type: isNew ? 'add' : 'update',
+                            data: newAgentData
+                        })
+                    });
+                }, 100);
+            }
 
         } catch (error) {
             console.error("Submit Error:", error)

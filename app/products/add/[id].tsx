@@ -3,12 +3,11 @@ import React, { useEffect, useState } from "react"
 import { Alert, StatusBar, Text ,StyleSheet} from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
-import { useLocalSearchParams } from "expo-router"
+import { router, useLocalSearchParams } from "expo-router"
 
 const ProductFormScreen = () => {
 
     const { id } = useLocalSearchParams()
-
 
     const isNew = id === "new"
     const [initialValues, setInitialValues] = useState({})
@@ -22,7 +21,6 @@ const ProductFormScreen = () => {
 
     const fetchProductData = async () => {
         try {
-           
             const response = await apiService.get(`/products/${id}`)
             const data = response.data.product;
 
@@ -78,7 +76,6 @@ const ProductFormScreen = () => {
                 }
             }
 
-
             console.log('formData ',formData)
             console.log('id ',id)
 
@@ -105,18 +102,43 @@ const ProductFormScreen = () => {
                 })
             }
 
-             
             if (!response.success) throw new Error("Upload failed")
 
+            // Create the new/updated product data to pass back
+            const newProductData = {
+                id: response.data?.id || id || Date.now().toString(),
+                name: values.product_info.name,
+                description: values.product_info.description,
+                price: `₹${values.product_info.buyPrice ?? 0}`,
+                rentPrice: `₹${values.product_info.rentPrice ?? 0}`,
+                deposit: `₹${values.product_info.deposit ?? 0}`,
+                isActive: values.product_info.isActive === 'true',
+                isRentable: values.product_info.isRentable === 'true',
+                isPurchasable: values.product_info.isPurchasable === 'true',
+            };
+
             Alert.alert("Success", `Product ${isNew ? "created" : "updated"} successfully`)
-            // navigation.goBack()
+            
+            // Navigate back with the new/updated data
+            if (router.canGoBack()) {
+                router.back();
+                // Use a timeout to ensure navigation completes before sending data
+                setTimeout(() => {
+                    // This will trigger a refresh in the list screen
+                    router.setParams({ 
+                        refreshData: JSON.stringify({
+                            type: isNew ? 'add' : 'update',
+                            data: newProductData
+                        })
+                    });
+                }, 100);
+            }
 
         } catch (error) {
             console.error("Submit Error:", error)
             Alert.alert("Error", "Failed to submit the form")
         }
     }
-
 
     const formSections: FormSection[] = [
         {
@@ -264,10 +286,7 @@ const ProductFormScreen = () => {
     )
 }
 
-
-
 export default ProductFormScreen
-
 
 const styles= StyleSheet.create({
     container :{

@@ -2,7 +2,7 @@ import { apiService } from '@/lib/api/api';
 import ProductSkeleton from '@/lib/components/skeltons/ProductSkeleton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActionSheetIOS,
@@ -22,6 +22,31 @@ const ProductScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const { refreshData } = useLocalSearchParams();
+
+  // Handle refresh data from form submissions
+  useEffect(() => {
+    if (refreshData) {
+      try {
+        const parsedData = JSON.parse(refreshData as string);
+        if (parsedData.type === 'add') {
+          // Add new product to the list
+          setProducts(prev => [parsedData.data, ...prev]);
+        } else if (parsedData.type === 'update') {
+          // Update existing product in the list
+          setProducts(prev => 
+            prev.map(product => 
+              product.id === parsedData.data.id ? parsedData.data : product
+            )
+          );
+        }
+        // Clear the refresh data parameter
+        router.setParams({ refreshData: undefined });
+      } catch (error) {
+        console.error('Error parsing refresh data:', error);
+      }
+    }
+  }, [refreshData]);
 
   const fetchProducts = async () => {
     try {

@@ -40,8 +40,32 @@ const OrdersScreen = () => {
     setLoading(true);
     try {
       const result = await apiService.get('/orders');
-      const data = result?.data || [];
-      if (!data || data.length === 0) {
+      console.log('Orders API response:', result);
+      
+      if (result.success && result.data && Array.isArray(result.data)) {
+        // Map the API response to our Order interface
+        const mappedOrders: Order[] = result.data.map((item: any) => ({
+          id: item.id || item._id || Date.now().toString(),
+          customerId: item.customerId || item.customer_id || '',
+          customerName: item.customerName || item.customer_name || 'Unknown Customer',
+          customerPhone: item.customerPhone || item.customer_phone || '',
+          productId: item.productId || item.product_id || '',
+          productName: item.productName || item.product_name || 'Unknown Product',
+          productImage: item.productImage || item.product_image,
+          type: (item.type || item.order_type || 'BUY').toUpperCase() as 'RENT' | 'BUY',
+          status: (item.status || 'CREATED').toUpperCase() as Order['status'],
+          totalAmount: item.totalAmount || item.total_amount || 0,
+          paymentStatus: (item.paymentStatus || item.payment_status || 'PENDING').toUpperCase() as Order['paymentStatus'],
+          serviceAgentId: item.serviceAgentId || item.service_agent_id,
+          serviceAgentName: item.serviceAgentName || item.service_agent_name,
+          installationDate: item.installationDate || item.installation_date,
+          createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+          updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
+        }));
+        
+        setOrders(mappedOrders);
+      } else {
+        // Fallback to mock data if API doesn't return data
         setOrders([
           {
             id: 'order-1',
@@ -121,11 +145,11 @@ const OrdersScreen = () => {
             updatedAt: '2024-06-23T09:30:00Z',
           },
         ]);
-      } else {
-        setOrders(data);
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
+      // Set empty array on error
+      setOrders([]);
     }
     setLoading(false);
     setRefreshing(false);
@@ -379,8 +403,6 @@ const OrdersScreen = () => {
           })
         )}
       </SkeletonWrapper>
-
-
     </View>
   );
 };

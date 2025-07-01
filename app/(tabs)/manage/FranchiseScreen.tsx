@@ -3,7 +3,7 @@ import { apiService } from '@/lib/api/api';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -17,6 +17,31 @@ const FranchiseScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const { viewAsFranchiseOwner } = useAuth();
+  const { refreshData } = useLocalSearchParams();
+
+  // Handle refresh data from form submissions
+  useEffect(() => {
+    if (refreshData) {
+      try {
+        const parsedData = JSON.parse(refreshData as string);
+        if (parsedData.type === 'add') {
+          // Add new franchise to the list
+          setFranchises(prev => [parsedData.data, ...prev]);
+        } else if (parsedData.type === 'update') {
+          // Update existing franchise in the list
+          setFranchises(prev => 
+            prev.map(franchise => 
+              franchise.id === parsedData.data.id ? parsedData.data : franchise
+            )
+          );
+        }
+        // Clear the refresh data parameter
+        router.setParams({ refreshData: undefined });
+      } catch (error) {
+        console.error('Error parsing refresh data:', error);
+      }
+    }
+  }, [refreshData]);
 
   const fetchFranchises = async () => {
     try {
