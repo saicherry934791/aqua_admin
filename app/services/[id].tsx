@@ -243,12 +243,6 @@ const ServiceDetailScreen = () => {
             case 'reschedule':
                 Alert.alert('Reschedule', 'Reschedule functionality would be implemented here');
                 break;
-            case 'assign_agent':
-                handleAssignAgent();
-                break;
-            case 'schedule_time':
-                handleScheduleTime();
-                break;
         }
     };
 
@@ -296,24 +290,18 @@ const ServiceDetailScreen = () => {
         switch (currentStatus) {
             case 'CREATED':
                 return [
-                    { key: 'assign_agent', title: 'Assign Agent', icon: 'person-add' },
-                    { key: 'schedule_time', title: 'Schedule Time', icon: 'calendar' },
                     { key: 'assign', title: 'Mark as Assigned', icon: 'person-add' },
                     { key: 'schedule', title: 'Mark as Scheduled', icon: 'calendar' },
                     { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case 'ASSIGNED':
                 return [
-                    { key: 'assign_agent', title: 'Reassign Agent', icon: 'person-add' },
-                    { key: 'schedule_time', title: 'Schedule Time', icon: 'calendar' },
                     { key: 'schedule', title: 'Mark as Scheduled', icon: 'calendar' },
                     { key: 'start', title: 'Start Service', icon: 'play' },
                     { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case 'SCHEDULED':
                 return [
-                    { key: 'assign_agent', title: 'Reassign Agent', icon: 'person-add' },
-                    { key: 'schedule_time', title: 'Reschedule Time', icon: 'calendar' },
                     { key: 'start', title: 'Start Service', icon: 'play' },
                     { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
@@ -472,6 +460,96 @@ const ServiceDetailScreen = () => {
                     </View>
                 </View>
 
+                {/* Service Agent Card */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.sectionTitle}>Service Agent</Text>
+                    </View>
+
+                    {serviceRequest.assignedToName ? (
+                        <View style={styles.agentSection}>
+                            <View style={styles.agentInfo}>
+                                <View style={styles.agentAvatar}>
+                                    <Ionicons name="person" size={20} color="#3B82F6" />
+                                </View>
+                                <View style={styles.agentDetails}>
+                                    <Text style={styles.agentName}>{serviceRequest.assignedToName}</Text>
+                                    <Text style={styles.agentStatus}>Assigned Agent</Text>
+                                </View>
+                            </View>
+                            
+                            <View style={styles.agentActions}>
+                                <TouchableOpacity
+                                    style={styles.agentActionButton}
+                                    onPress={handleAssignAgent}
+                                >
+                                    <Ionicons name="swap-horizontal" size={16} color="#3B82F6" />
+                                    <Text style={styles.agentActionText}>Reassign</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : (
+                        <TouchableOpacity 
+                            style={styles.noAgentSection}
+                            onPress={handleAssignAgent}
+                        >
+                            <View style={styles.noAgentIcon}>
+                                <Ionicons name="person-add" size={24} color="#6B7280" />
+                            </View>
+                            <View style={styles.noAgentContent}>
+                                <Text style={styles.noAgentText}>No Agent Assigned</Text>
+                                <Text style={styles.noAgentSubtext}>Tap to assign a service agent</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Schedule Card */}
+                <View style={styles.sectionCard}>
+                    <View style={styles.cardHeader}>
+                        <Text style={styles.sectionTitle}>Schedule</Text>
+                    </View>
+
+                    {serviceRequest.scheduledDate ? (
+                        <View style={styles.scheduleSection}>
+                            <View style={styles.scheduleInfo}>
+                                <View style={styles.scheduleIcon}>
+                                    <Ionicons name="calendar" size={20} color="#10B981" />
+                                </View>
+                                <View style={styles.scheduleDetails}>
+                                    <Text style={styles.scheduleDate}>{formatDateFull(serviceRequest.scheduledDate)}</Text>
+                                    <Text style={styles.scheduleStatus}>Scheduled</Text>
+                                </View>
+                            </View>
+                            
+                            <View style={styles.scheduleActions}>
+                                <TouchableOpacity
+                                    style={styles.scheduleActionButton}
+                                    onPress={handleScheduleTime}
+                                >
+                                    <Ionicons name="create" size={16} color="#10B981" />
+                                    <Text style={styles.scheduleActionText}>Update</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : (
+                        <TouchableOpacity 
+                            style={styles.noScheduleSection}
+                            onPress={handleScheduleTime}
+                        >
+                            <View style={styles.noScheduleIcon}>
+                                <Ionicons name="calendar-outline" size={24} color="#6B7280" />
+                            </View>
+                            <View style={styles.noScheduleContent}>
+                                <Text style={styles.noScheduleText}>Not Scheduled</Text>
+                                <Text style={styles.noScheduleSubtext}>Tap to schedule service time</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
                 {/* Service Details */}
                 <View style={styles.sectionCard}>
                     <Text style={styles.sectionTitle}>Service Details</Text>
@@ -486,13 +564,6 @@ const ServiceDetailScreen = () => {
                             <Text style={styles.detailLabel}>Franchise Area</Text>
                             <Text style={styles.detailValue}>{serviceRequest.franchiseAreaName}</Text>
                         </View>
-
-                        {serviceRequest.assignedToName && (
-                            <View style={styles.detailItem}>
-                                <Text style={styles.detailLabel}>Assigned To</Text>
-                                <Text style={styles.detailValue}>{serviceRequest.assignedToName}</Text>
-                            </View>
-                        )}
 
                         {serviceRequest.estimatedDuration && (
                             <View style={styles.detailItem}>
@@ -577,20 +648,22 @@ const ServiceDetailScreen = () => {
             </ScrollView>
 
             {/* Action Button */}
-            <TouchableOpacity
-                style={[styles.actionButton, updating && styles.actionButtonDisabled]}
-                onPress={showActionSheet}
-                disabled={updating}
-            >
-                {updating ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                    <>
-                        <Ionicons name="options" size={20} color="#fff" />
-                        <Text style={styles.actionButtonText}>Update Service</Text>
-                    </>
-                )}
-            </TouchableOpacity>
+            {availableActions.length > 0 && (
+                <TouchableOpacity
+                    style={[styles.actionButton, updating && styles.actionButtonDisabled]}
+                    onPress={showActionSheet}
+                    disabled={updating}
+                >
+                    {updating ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <>
+                            <Ionicons name="options" size={20} color="#fff" />
+                            <Text style={styles.actionButtonText}>Update Status</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
+            )}
 
             {/* Action Sheet */}
             <ActionSheet
@@ -601,7 +674,7 @@ const ServiceDetailScreen = () => {
                 CustomHeaderComponent={
                     <View style={styles.actionSheetHeader}>
                         <View style={styles.actionSheetHandle} />
-                        <Text style={styles.actionSheetTitle}>Update Service Request</Text>
+                        <Text style={styles.actionSheetTitle}>Update Service Status</Text>
                         <Text style={styles.actionSheetSubtitle}>Choose an action to update this service request</Text>
                     </View>
                 }
@@ -797,6 +870,12 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
     sectionTitle: {
         fontSize: 16,
         fontWeight: '600',
@@ -865,6 +944,164 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         flex: 1,
         lineHeight: 20,
+    },
+    // Agent Section Styles
+    agentSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    agentInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    agentAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#EEF2FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    agentDetails: {
+        flex: 1,
+    },
+    agentName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#111827',
+        marginBottom: 2,
+    },
+    agentStatus: {
+        fontSize: 12,
+        color: '#10B981',
+        fontWeight: '500',
+    },
+    agentActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    agentActionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EEF2FF',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 4,
+    },
+    agentActionText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#3B82F6',
+    },
+    noAgentSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderStyle: 'dashed',
+    },
+    noAgentIcon: {
+        marginRight: 12,
+    },
+    noAgentContent: {
+        flex: 1,
+    },
+    noAgentText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#374151',
+        marginBottom: 2,
+    },
+    noAgentSubtext: {
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    // Schedule Section Styles
+    scheduleSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    scheduleInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    scheduleIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#ECFDF5',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    scheduleDetails: {
+        flex: 1,
+    },
+    scheduleDate: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#111827',
+        marginBottom: 2,
+    },
+    scheduleStatus: {
+        fontSize: 12,
+        color: '#10B981',
+        fontWeight: '500',
+    },
+    scheduleActions: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    scheduleActionButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 12,
+        gap: 4,
+    },
+    scheduleActionText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#10B981',
+    },
+    noScheduleSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderStyle: 'dashed',
+    },
+    noScheduleIcon: {
+        marginRight: 12,
+    },
+    noScheduleContent: {
+        flex: 1,
+    },
+    noScheduleText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#374151',
+        marginBottom: 2,
+    },
+    noScheduleSubtext: {
+        fontSize: 12,
+        color: '#6B7280',
     },
     detailsGrid: {
         gap: 16,
