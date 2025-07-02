@@ -1,14 +1,15 @@
 import { Button } from '@react-navigation/elements';
 import { router, useNavigation } from 'expo-router';
 import { LocationEdit as Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity, ChartBar as BarChart3, ChartPie as PieChart } from 'lucide-react-native';
-import React, { useContext, useLayoutEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions } from 'react-native';
+import React, { useContext, useLayoutEffect, useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions, ActivityIndicator } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { DistributionPieChart } from '@/lib/components/grphs/DistributionPieChart';
 import { ComparisonLineChart } from '@/lib/components/grphs/ComparisonLineChart';
 import { ComparisonBarChart } from '@/lib/components/grphs/ComparisonBarChart';
 import { BarChartData, LineChartData } from '@/lib/components/grphs/ChartTypes';
+import { apiService } from '@/lib/api/api';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -101,44 +102,103 @@ const QuickActionCard = ({
 
 export default function DashboardScreen() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [startDate, setStartDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)); // 30 days ago
   const [endDate, setEndDate] = useState(new Date());
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
 
   const { user } = useAuth();
   
   const navigation = useNavigation();
 
-  // Sample data for charts - replace with real data
-  const pieChartData = [
-    { name: 'Active Orders', population: 45, color: '#007bff' },
-    { name: 'Completed', population: 30, color: '#10B981' },
-    { name: 'Pending', population: 15, color: '#F59E0B' },
-    { name: 'Cancelled', population: 10, color: '#EF4444' }
-  ];
+  // Fetch dashboard data from API
+  const fetchDashboardData = async () => {
+    if (!user) return;
+    
+    setIsDashboardLoading(true);
+    try {
+      const params = new URLSearchParams({
+        from: startDate.toISOString().split('T')[0],
+        to: endDate.toISOString().split('T')[0],
+      });
 
-  const lineChartData: LineChartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        label: 'Revenue',
-        data: [4000, 3000, 2000, 2780, 1890, 2390],
-      },
-      {
-        label: 'Orders',
-        data: [240, 139, 980, 390, 480, 380],
-      },
-    ],
+      const result = await apiService.get(`/dashboard/stats?${params}`);
+      
+      if (result.success) {
+        setDashboardData(result.data);
+      } else {
+        // Fallback to mock data if API fails
+        setDashboardData(getMockDashboardData());
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+      // Fallback to mock data
+      setDashboardData(getMockDashboardData());
+    } finally {
+      setIsDashboardLoading(false);
+    }
   };
 
-  const barChartData: BarChartData = {
-    labels: ['Products', 'Services', 'Rentals', 'Sales'],
-    datasets: [
-      {
-        label: 'Values',
-        data: [25, 15, 30, 20],
+  // Mock data fallback
+  const getMockDashboardData = () => ({
+    overview: {
+      totalRevenue: { value: 250000, trend: '+12.5%' },
+      activeFranchises: { value: 15, trend: '+2' },
+      totalOrders: { value: 342, trend: '+8.3%' },
+      serviceRequests: { value: 28, trend: '-2.1%' },
+      monthlyRevenue: { value: 45000, trend: '+15.2%' },
+      activeOrders: { value: 42, trend: '+5' },
+      newCustomers: { value: 15, trend: '+8' },
+      serviceTasks: { value: 12, trend: '-2' },
+      todaysTasks: { value: 8, trend: null },
+      completedTasks: { value: 5, trend: null },
+      pendingTasks: { value: 3, trend: null },
+      weeklyTasks: { value: 32, trend: null }
+    },
+    trends: {
+      orderDistribution: [
+        { name: 'Active Orders', population: 45, color: '#007bff' },
+        { name: 'Completed', population: 30, color: '#10B981' },
+        { name: 'Pending', population: 15, color: '#F59E0B' },
+        { name: 'Cancelled', population: 10, color: '#EF4444' }
+      ],
+      revenueOrdersTrend: {
+        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        datasets: [
+          {
+            label: 'Revenue',
+            data: [4000, 3000, 2000, 2780, 1890, 2390],
+          },
+          {
+            label: 'Orders',
+            data: [240, 139, 980, 390, 480, 380],
+          },
+        ],
       },
-    ],
-  };
+      performanceByCategory: {
+        labels: ['Products', 'Services', 'Rentals', 'Sales'],
+        datasets: [
+          {
+            label: 'Values',
+            data: [25, 15, 30, 20],
+          },
+        ],
+      }
+    },
+    finance: {
+      totalIncome: { value: 750000, trend: '+18.5%' },
+      expenses: { value: 250000, trend: '+5.2%' },
+      netProfit: { value: 500000, trend: '+25.8%' },
+      franchiseRevenue: { value: 420000, trend: '+12.3%' },
+      orderRevenue: { value: 45000, trend: '+15.2%' },
+      serviceRevenue: { value: 12000, trend: '+8.7%' },
+      monthlyGrowth: { value: 15, trend: '+3.2%' }
+    }
+  });
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [user, startDate, endDate]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -210,6 +270,15 @@ export default function DashboardScreen() {
   const renderDashboardContent = () => {
     const userRole = user?.role;
 
+    if (isDashboardLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
+          <Text style={styles.loadingText}>Loading dashboard data...</Text>
+        </View>
+      );
+    }
+
     if (userRole === UserRole.ADMIN) {
       return renderAdminContent();
     } else if (userRole === UserRole.FRANCHISE_OWNER) {
@@ -222,6 +291,8 @@ export default function DashboardScreen() {
   };
 
   const renderAdminContent = () => {
+    const data = dashboardData || getMockDashboardData();
+    
     switch (activeTab) {
       case 'overview':
         return (
@@ -230,17 +301,17 @@ export default function DashboardScreen() {
             <View style={styles.statsGrid}>
               <StatCard
                 title="Total Revenue"
-                value="₹2.5L"
+                value={`₹${(data.overview.totalRevenue.value / 100000).toFixed(1)}L`}
                 icon={DollarSign}
-                trend="+12.5%"
+                trend={data.overview.totalRevenue.trend}
                 color="#10B981"
                 onPress={() => router.push('/finance')}
               />
               <StatCard
                 title="Active Franchises"
-                value="15"
+                value={data.overview.activeFranchises.value.toString()}
                 icon={MapPin}
-                trend="+2"
+                trend={data.overview.activeFranchises.trend}
                 color="#007bff"
                 onPress={() => router.push({
                   pathname: '/manage',
@@ -249,17 +320,17 @@ export default function DashboardScreen() {
               />
               <StatCard
                 title="Total Orders"
-                value="342"
+                value={data.overview.totalOrders.value.toString()}
                 icon={Package}
-                trend="+8.3%"
+                trend={data.overview.totalOrders.trend}
                 color="#F59E0B"
                 onPress={() => router.push('/orders')}
               />
               <StatCard
                 title="Service Requests"
-                value="28"
+                value={data.overview.serviceRequests.value.toString()}
                 icon={Wrench}
-                trend="-2.1%"
+                trend={data.overview.serviceRequests.trend}
                 color="#EF4444"
                 onPress={() => router.push('/service')}
               />
@@ -284,7 +355,7 @@ export default function DashboardScreen() {
                   subtitle="Performance insights"
                   icon={TrendingUp}
                   color="#10B981"
-                  onPress={() => router.push('/analytics')}
+                  onPress={() => setActiveTab('trends')}
                 />
               </View>
             </View>
@@ -297,19 +368,19 @@ export default function DashboardScreen() {
             {/* Charts Section */}
             <View style={styles.chartsSection}>
               <DistributionPieChart
-                data={pieChartData}
+                data={data.trends.orderDistribution}
                 title="Order Distribution"
                 height={200}
               />
               <View style={styles.chartSpacing} />
               <ComparisonLineChart
-                data={lineChartData}
+                data={data.trends.revenueOrdersTrend}
                 title="Revenue & Orders Trend"
                 height={220}
               />
               <View style={styles.chartSpacing} />
               <ComparisonBarChart
-                data={barChartData}
+                data={data.trends.performanceByCategory}
                 title="Performance by Category"
                 height={220}
               />
@@ -321,19 +392,38 @@ export default function DashboardScreen() {
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
-              <StatCard title="Total Income" value="₹7.5L" icon={DollarSign} color="#10B981" />
-              <StatCard title="Expenses" value="₹2.5L" icon={DollarSign} color="#EF4444" />
-              <StatCard title="Net Profit" value="₹5L" icon={TrendingUp} color="#007bff" />
-              <StatCard title="Franchise Revenue" value="₹4.2L" icon={MapPin} color="#F59E0B" />
+              <StatCard 
+                title="Total Income" 
+                value={`₹${(data.finance.totalIncome.value / 100000).toFixed(1)}L`} 
+                icon={DollarSign} 
+                trend={data.finance.totalIncome.trend}
+                color="#10B981" 
+              />
+              <StatCard 
+                title="Expenses" 
+                value={`₹${(data.finance.expenses.value / 100000).toFixed(1)}L`} 
+                icon={DollarSign} 
+                trend={data.finance.expenses.trend}
+                color="#EF4444" 
+              />
+              <StatCard 
+                title="Net Profit" 
+                value={`₹${(data.finance.netProfit.value / 100000).toFixed(1)}L`} 
+                icon={TrendingUp} 
+                trend={data.finance.netProfit.trend}
+                color="#007bff" 
+              />
+              <StatCard 
+                title="Franchise Revenue" 
+                value={`₹${(data.finance.franchiseRevenue.value / 100000).toFixed(1)}L`} 
+                icon={MapPin} 
+                trend={data.finance.franchiseRevenue.trend}
+                color="#F59E0B" 
+              />
             </View>
-            <ComparisonBarChart
-              data={barChartData}
-              title="Revenue by Category"
-              height={220}
-            />
             <View style={styles.chartSpacing} />
             <ComparisonLineChart
-              data={lineChartData}
+              data={data.trends.revenueOrdersTrend}
               title="Financial Trends"
               height={220}
             />
@@ -346,6 +436,8 @@ export default function DashboardScreen() {
   };
 
   const renderFranchiseContent = () => {
+    const data = dashboardData || getMockDashboardData();
+    
     switch (activeTab) {
       case 'overview':
         return (
@@ -353,30 +445,30 @@ export default function DashboardScreen() {
             <View style={styles.statsGrid}>
               <StatCard
                 title="Monthly Revenue"
-                value="₹45K"
+                value={`₹${(data.overview.monthlyRevenue.value / 1000).toFixed(0)}K`}
                 icon={DollarSign}
-                trend="+15.2%"
+                trend={data.overview.monthlyRevenue.trend}
                 color="#10B981"
               />
               <StatCard
                 title="Active Orders"
-                value="42"
+                value={data.overview.activeOrders.value.toString()}
                 icon={Package}
-                trend="+5"
+                trend={data.overview.activeOrders.trend}
                 color="#007bff"
               />
               <StatCard
                 title="New Customers"
-                value="15"
+                value={data.overview.newCustomers.value.toString()}
                 icon={Users}
-                trend="+8"
+                trend={data.overview.newCustomers.trend}
                 color="#F59E0B"
               />
               <StatCard
                 title="Service Tasks"
-                value="12"
+                value={data.overview.serviceTasks.value.toString()}
                 icon={Wrench}
-                trend="-2"
+                trend={data.overview.serviceTasks.trend}
                 color="#EF4444"
               />
             </View>
@@ -411,19 +503,19 @@ export default function DashboardScreen() {
           <View style={styles.contentContainer}>
             <View style={styles.chartsSection}>
               <DistributionPieChart
-                data={pieChartData}
+                data={data.trends.orderDistribution}
                 title="Customer Distribution"
                 height={200}
               />
               <View style={styles.chartSpacing} />
               <ComparisonLineChart
-                data={lineChartData}
+                data={data.trends.revenueOrdersTrend}
                 title="Franchise Performance"
                 height={220}
               />
               <View style={styles.chartSpacing} />
               <ComparisonBarChart
-                data={barChartData}
+                data={data.trends.performanceByCategory}
                 title="Service Categories"
                 height={220}
               />
@@ -435,19 +527,41 @@ export default function DashboardScreen() {
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
-              <StatCard title="Total Orders" value="156" icon={Package} />
-              <StatCard title="Order Revenue" value="₹45K" icon={DollarSign} color="#10B981" />
-              <StatCard title="Service Revenue" value="₹12K" icon={Wrench} color="#8B5CF6" />
-              <StatCard title="Monthly Growth" value="+15%" icon={TrendingUp} color="#F59E0B" />
+              <StatCard 
+                title="Total Orders" 
+                value="156" 
+                icon={Package} 
+              />
+              <StatCard 
+                title="Order Revenue" 
+                value={`₹${(data.finance.orderRevenue.value / 1000).toFixed(0)}K`} 
+                icon={DollarSign} 
+                trend={data.finance.orderRevenue.trend}
+                color="#10B981" 
+              />
+              <StatCard 
+                title="Service Revenue" 
+                value={`₹${(data.finance.serviceRevenue.value / 1000).toFixed(0)}K`} 
+                icon={Wrench} 
+                trend={data.finance.serviceRevenue.trend}
+                color="#8B5CF6" 
+              />
+              <StatCard 
+                title="Monthly Growth" 
+                value={`+${data.finance.monthlyGrowth.value}%`} 
+                icon={TrendingUp} 
+                trend={data.finance.monthlyGrowth.trend}
+                color="#F59E0B" 
+              />
             </View>
             <ComparisonLineChart
-              data={lineChartData}
+              data={data.trends.revenueOrdersTrend}
               title="Revenue Trends"
               height={220}
             />
             <View style={styles.chartSpacing} />
             <ComparisonBarChart
-              data={barChartData}
+              data={data.trends.performanceByCategory}
               title="Revenue Sources"
               height={220}
             />
@@ -460,6 +574,8 @@ export default function DashboardScreen() {
   };
 
   const renderServiceAgentContent = () => {
+    const data = dashboardData || getMockDashboardData();
+    
     switch (activeTab) {
       case 'overview':
         return (
@@ -467,25 +583,25 @@ export default function DashboardScreen() {
             <View style={styles.statsGrid}>
               <StatCard
                 title="Today's Tasks"
-                value="8"
+                value={data.overview.todaysTasks.value.toString()}
                 icon={Wrench}
                 color="#007bff"
               />
               <StatCard
                 title="Completed"
-                value="5"
+                value={data.overview.completedTasks.value.toString()}
                 icon={Activity}
                 color="#10B981"
               />
               <StatCard
                 title="Pending"
-                value="3"
+                value={data.overview.pendingTasks.value.toString()}
                 icon={Calendar}
                 color="#F59E0B"
               />
               <StatCard
                 title="This Week"
-                value="32"
+                value={data.overview.weeklyTasks.value.toString()}
                 icon={TrendingUp}
                 color="#8B5CF6"
               />
@@ -518,13 +634,13 @@ export default function DashboardScreen() {
           <View style={styles.contentContainer}>
             <View style={styles.chartsSection}>
               <DistributionPieChart
-                data={pieChartData}
+                data={data.trends.orderDistribution}
                 title="Task Distribution"
                 height={200}
               />
               <View style={styles.chartSpacing} />
               <ComparisonLineChart
-                data={lineChartData}
+                data={data.trends.revenueOrdersTrend}
                 title="Weekly Performance"
                 height={220}
               />
@@ -691,6 +807,18 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Outfit_500Medium',
+    color: '#6B7280',
+    marginTop: 16,
   },
   statsGrid: {
     flexDirection: 'row',
