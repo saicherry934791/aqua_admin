@@ -13,8 +13,16 @@ import {
     ActivityIndicator,
     RefreshControl
 } from 'react-native';
-import ActionSheet from 'react-native-actions-sheet';
 import { SheetManager } from 'react-native-actions-sheet';
+
+// Backend service request statuses
+export enum ServiceRequestStatus {
+    CREATED = 'created',
+    ASSIGNED = 'assigned',
+    IN_PROGRESS = 'in_progress',
+    COMPLETED = 'completed',
+    CANCELLED = 'cancelled',
+}
 
 interface ServiceRequest {
     id: string;
@@ -27,7 +35,7 @@ interface ServiceRequest {
     orderId?: string;
     type: 'INSTALLATION' | 'MAINTENANCE' | 'REPAIR' | 'REPLACEMENT';
     description: string;
-    status: 'CREATED' | 'ASSIGNED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+    status: ServiceRequestStatus;
     assignedToId?: string;
     assignedToName?: string;
     franchiseAreaId: string;
@@ -37,11 +45,9 @@ interface ServiceRequest {
     createdAt: string;
     updatedAt: string;
     priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-    notes?: string;
     customerEmail?: string;
     estimatedDuration?: number;
     actualDuration?: number;
-    materials?: string[];
     cost?: number;
 }
 
@@ -51,18 +57,18 @@ const ServiceDetailScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [updating, setUpdating] = useState(false);
-    const actionSheetRef = useRef<ActionSheet>(null);
 
     const fetchServiceRequest = async () => {
         setLoading(true);
         try {
             const result = await apiService.get(`/service-requests/${id}`);
-            if(!result.success){
-                setServiceRequest(null)
-                return
+            if (!result.success) {
+                setServiceRequest(null);
+                return;
             }
-            const data = result.data.serviceRequest
-            console.log('data came here for sr ',data)
+            const data = result.data.serviceRequest;
+            console.log('Service request data:', data);
+            
             setServiceRequest({
                 id: data.id,
                 customerId: data.customer.id,
@@ -75,24 +81,19 @@ const ServiceDetailScreen = () => {
                 orderId: data.orderId,
                 type: data.type,
                 description: data.product.description,
-                status: 'SCHEDULED',
+                status: data.status, // Use backend status directly
                 assignedToId: data.assignedToId,
                 assignedToName: data.assignedTo?.name || null,
                 franchiseAreaId: data.franchiseAreaId,
-                franchiseAreaName: 'Hyderabad Central',
-                scheduledDate: '2024-06-28T10:00:00Z',
+                franchiseAreaName: data.franchiseAreaName || 'Service Area',
+                scheduledDate: data.scheduledDate,
                 createdAt: data.createdAt,
-                updatedAt: '2024-06-26T15:45:00Z',
-                priority: 'HIGH',
-                notes: 'Customer requested morning slot. Ensure to carry all necessary tools and spare parts.',
-                estimatedDuration: 120,
-                materials: ['RO Membrane', 'Pre-filters', 'Tubing', 'Fittings'],
-                cost: 15000
+                updatedAt: data.updatedAt,
+                priority: data.priority || 'MEDIUM',
+                estimatedDuration: data.estimatedDuration || 120,
+                cost: data.cost || 0
             });
 
-            console.log('service request is ', JSON.stringify(result.data.serviceRequest))
-            // Using mock data for now
-            // setServiceRequest(mockServiceRequest);
         } catch (error) {
             console.error('Failed to fetch service request:', error);
             Alert.alert('Error', 'Failed to load service request details');
@@ -110,15 +111,20 @@ const ServiceDetailScreen = () => {
         fetchServiceRequest();
     }, [id]);
 
-    const getStatusColor = (status: string) => {
+    const getStatusColor = (status: ServiceRequestStatus) => {
         switch (status) {
-            case 'CREATED': return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
-            case 'ASSIGNED': return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6', border: '#C4B5FD' };
-            case 'SCHEDULED': return { bg: '#ECFDF5', text: '#047857', dot: '#10B981', border: '#A7F3D0' };
-            case 'IN_PROGRESS': return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B', border: '#FDE68A' };
-            case 'COMPLETED': return { bg: '#D1FAE5', text: '#047857', dot: '#059669', border: '#6EE7B7' };
-            case 'CANCELLED': return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444', border: '#FECACA' };
-            default: return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
+            case ServiceRequestStatus.CREATED: 
+                return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
+            case ServiceRequestStatus.ASSIGNED: 
+                return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6', border: '#C4B5FD' };
+            case ServiceRequestStatus.IN_PROGRESS: 
+                return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B', border: '#FDE68A' };
+            case ServiceRequestStatus.COMPLETED: 
+                return { bg: '#D1FAE5', text: '#047857', dot: '#059669', border: '#6EE7B7' };
+            case ServiceRequestStatus.CANCELLED: 
+                return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444', border: '#FECACA' };
+            default: 
+                return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
         }
     };
 
@@ -181,22 +187,24 @@ const ServiceDetailScreen = () => {
         Linking.openURL(`https://maps.google.com/?q=${encodedAddress}`);
     };
 
-    const updateServiceStatus = async (newStatus: string) => {
+    const updateServiceStatus = async (newStatus: ServiceRequestStatus) => {
         setUpdating(true);
         try {
-            // const result = await apiService.put(`/service-requests/${id}`, { status: newStatus });
-            // setServiceRequest(result?.data || serviceRequest);
-
-            // Mock update
-            if (serviceRequest) {
-                setServiceRequest({
-                    ...serviceRequest,
-                    status: newStatus as any,
+            const result = await apiService.patch(`/service-requests/${id}/status`, { 
+                status: newStatus 
+            });
+            
+            if (result.success) {
+                setServiceRequest(prev => prev ? {
+                    ...prev,
+                    status: newStatus,
                     updatedAt: new Date().toISOString()
-                });
+                } : null);
+                
+                Alert.alert('Success', `Service request ${getStatusDisplayName(newStatus)}`);
+            } else {
+                throw new Error(result.error || 'Failed to update status');
             }
-
-            Alert.alert('Success', `Service request ${newStatus.toLowerCase().replace('_', ' ')}`);
         } catch (error) {
             console.error('Failed to update service request:', error);
             Alert.alert('Error', 'Failed to update service request');
@@ -204,45 +212,14 @@ const ServiceDetailScreen = () => {
         setUpdating(false);
     };
 
-    const showActionSheet = () => {
-        actionSheetRef.current?.show();
-    };
-
-    const handleActionPress = (action: string) => {
-        actionSheetRef.current?.hide();
-
-        switch (action) {
-            case 'assign':
-                updateServiceStatus('ASSIGNED');
-                break;
-            case 'schedule':
-                updateServiceStatus('SCHEDULED');
-                break;
-            case 'start':
-                updateServiceStatus('IN_PROGRESS');
-                break;
-            case 'complete':
-                updateServiceStatus('COMPLETED');
-                break;
-            case 'pause':
-                updateServiceStatus('ASSIGNED');
-                break;
-            case 'cancel':
-                Alert.alert(
-                    'Confirm Cancellation',
-                    'Are you sure you want to cancel this service request?',
-                    [
-                        { text: 'No', style: 'cancel' },
-                        { text: 'Yes', onPress: () => updateServiceStatus('CANCELLED'), style: 'destructive' }
-                    ]
-                );
-                break;
-            case 'reopen':
-                updateServiceStatus('CREATED');
-                break;
-            case 'reschedule':
-                Alert.alert('Reschedule', 'Reschedule functionality would be implemented here');
-                break;
+    const getStatusDisplayName = (status: ServiceRequestStatus): string => {
+        switch (status) {
+            case ServiceRequestStatus.CREATED: return 'Created';
+            case ServiceRequestStatus.ASSIGNED: return 'Assigned';
+            case ServiceRequestStatus.IN_PROGRESS: return 'In Progress';
+            case ServiceRequestStatus.COMPLETED: return 'Completed';
+            case ServiceRequestStatus.CANCELLED: return 'Cancelled';
+            default: return status;
         }
     };
 
@@ -288,40 +265,62 @@ const ServiceDetailScreen = () => {
         const currentStatus = serviceRequest.status;
 
         switch (currentStatus) {
-            case 'CREATED':
+            case ServiceRequestStatus.CREATED:
                 return [
-                    { key: 'assign', title: 'Mark as Assigned', icon: 'person-add' },
-                    { key: 'schedule', title: 'Mark as Scheduled', icon: 'calendar' },
-                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                    { key: ServiceRequestStatus.ASSIGNED, label: 'Mark as Assigned', icon: 'person-add' },
+                    { key: ServiceRequestStatus.IN_PROGRESS, label: 'Start Service', icon: 'play' },
+                    { key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
-            case 'ASSIGNED':
+            case ServiceRequestStatus.ASSIGNED:
                 return [
-                    { key: 'schedule', title: 'Mark as Scheduled', icon: 'calendar' },
-                    { key: 'start', title: 'Start Service', icon: 'play' },
-                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                    { key: ServiceRequestStatus.IN_PROGRESS, label: 'Start Service', icon: 'play' },
+                    { key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
-            case 'SCHEDULED':
+            case ServiceRequestStatus.IN_PROGRESS:
                 return [
-                    { key: 'start', title: 'Start Service', icon: 'play' },
-                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                    { key: ServiceRequestStatus.COMPLETED, label: 'Complete Service', icon: 'checkmark-circle' },
+                    { key: ServiceRequestStatus.ASSIGNED, label: 'Pause Service', icon: 'pause' },
+                    { key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
-            case 'IN_PROGRESS':
+            case ServiceRequestStatus.COMPLETED:
                 return [
-                    { key: 'complete', title: 'Complete Service', icon: 'checkmark-circle' },
-                    { key: 'pause', title: 'Pause Service', icon: 'pause' },
-                    { key: 'cancel', title: 'Cancel Request', icon: 'close-circle', destructive: true },
+                    { key: ServiceRequestStatus.CREATED, label: 'Reopen Service', icon: 'refresh' },
                 ];
-            case 'COMPLETED':
+            case ServiceRequestStatus.CANCELLED:
                 return [
-                    { key: 'reopen', title: 'Reopen Service', icon: 'refresh' },
-                ];
-            case 'CANCELLED':
-                return [
-                    { key: 'reopen', title: 'Reopen Service', icon: 'refresh' },
+                    { key: ServiceRequestStatus.CREATED, label: 'Reopen Service', icon: 'refresh' },
                 ];
             default:
                 return [];
         }
+    };
+
+    const showStatusActionSheet = () => {
+        const availableActions = getAvailableActions();
+        
+        if (availableActions.length === 0) {
+            Alert.alert('No Actions', 'No status updates available for this service request.');
+            return;
+        }
+
+        const options = [
+            ...availableActions.map(action => action.label),
+            'Cancel'
+        ];
+
+        Alert.alert(
+            'Update Status',
+            'Choose a new status for this service request',
+            [
+                ...availableActions.map((action, index) => ({
+                    text: action.label,
+                    style: action.destructive ? 'destructive' : 'default',
+                    onPress: () => updateServiceStatus(action.key)
+                })),
+                { text: 'Cancel', style: 'cancel' }
+            ],
+            { cancelable: true }
+        );
     };
 
     if (loading) {
@@ -391,7 +390,7 @@ const ServiceDetailScreen = () => {
                             }]}>
                                 <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
                                 <Text style={[styles.statusTextLarge, { color: statusColors.text }]}>
-                                    {serviceRequest.status.replace('_', ' ')}
+                                    {getStatusDisplayName(serviceRequest.status)}
                                 </Text>
                             </View>
                         </View>
@@ -432,7 +431,7 @@ const ServiceDetailScreen = () => {
                             </View>
                         </View>
 
-                        {serviceRequest.customerEmail && (
+                        {serviceRequest.customerEmail && serviceRequest.customerEmail !== 'N/A' && (
                             <View style={styles.contactRow}>
                                 <View style={styles.contactItem}>
                                     <Ionicons name="mail" size={16} color="#6B7280" />
@@ -572,7 +571,7 @@ const ServiceDetailScreen = () => {
                             </View>
                         )}
 
-                        {serviceRequest.cost && (
+                        {serviceRequest.cost && serviceRequest.cost > 0 && (
                             <View style={styles.detailItem}>
                                 <Text style={styles.detailLabel}>Service Cost</Text>
                                 <Text style={styles.detailValue}>₹{serviceRequest.cost.toLocaleString()}</Text>
@@ -622,28 +621,6 @@ const ServiceDetailScreen = () => {
                     </View>
                 </View>
 
-                {/* Materials */}
-                {serviceRequest.materials && serviceRequest.materials.length > 0 && (
-                    <View style={styles.sectionCard}>
-                        <Text style={styles.sectionTitle}>Required Materials</Text>
-                        <View style={styles.materialsContainer}>
-                            {serviceRequest.materials.map((material, index) => (
-                                <View key={index} style={styles.materialChip}>
-                                    <Text style={styles.materialText}>{material}</Text>
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
-
-                {/* Notes */}
-                {serviceRequest.notes && (
-                    <View style={styles.sectionCard}>
-                        <Text style={styles.sectionTitle}>Notes</Text>
-                        <Text style={styles.notesText}>{serviceRequest.notes}</Text>
-                    </View>
-                )}
-
                 <View style={styles.bottomPadding} />
             </ScrollView>
 
@@ -651,7 +628,7 @@ const ServiceDetailScreen = () => {
             {availableActions.length > 0 && (
                 <TouchableOpacity
                     style={[styles.actionButton, updating && styles.actionButtonDisabled]}
-                    onPress={showActionSheet}
+                    onPress={showStatusActionSheet}
                     disabled={updating}
                 >
                     {updating ? (
@@ -664,54 +641,6 @@ const ServiceDetailScreen = () => {
                     )}
                 </TouchableOpacity>
             )}
-
-            {/* Action Sheet */}
-            <ActionSheet
-                ref={actionSheetRef}
-                containerStyle={styles.actionSheetContainer}
-                gestureEnabled={true}
-                headerAlwaysVisible={true}
-                CustomHeaderComponent={
-                    <View style={styles.actionSheetHeader}>
-                        <View style={styles.actionSheetHandle} />
-                        <Text style={styles.actionSheetTitle}>Update Service Status</Text>
-                        <Text style={styles.actionSheetSubtitle}>Choose an action to update this service request</Text>
-                    </View>
-                }
-            >
-                <View style={styles.actionSheetContent}>
-                    {availableActions.map((action, index) => (
-                        <TouchableOpacity
-                            key={action.key}
-                            style={[
-                                styles.actionSheetItem,
-                                action.destructive && styles.actionSheetItemDestructive,
-                                index === availableActions.length - 1 && styles.actionSheetItemLast
-                            ]}
-                            onPress={() => handleActionPress(action.key)}
-                        >
-                            <View style={styles.actionSheetItemContent}>
-                                <View style={[
-                                    styles.actionSheetItemIcon,
-                                    action.destructive && styles.actionSheetItemIconDestructive
-                                ]}>
-                                    <Ionicons
-                                        name={action.icon as any}
-                                        size={20}
-                                        color={action.destructive ? '#EF4444' : '#3B82F6'}
-                                    />
-                                </View>
-                                <Text style={[
-                                    styles.actionSheetItemText,
-                                    action.destructive && styles.actionSheetItemTextDestructive
-                                ]}>
-                                    {action.title}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </ActionSheet>
         </View>
     );
 };
@@ -883,7 +812,7 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     customerInfo: {
-        gap: 16,
+        gap: 12,
     },
     customerRow: {
         flexDirection: 'row',
@@ -1154,29 +1083,6 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         marginTop: 2,
     },
-    materialsContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    materialChip: {
-        backgroundColor: '#EEF2FF',
-        borderRadius: 16,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderWidth: 1,
-        borderColor: '#C7D2FE',
-    },
-    materialText: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: '#4F46E5',
-    },
-    notesText: {
-        fontSize: 14,
-        color: '#6B7280',
-        lineHeight: 20,
-    },
     bottomPadding: {
         height: 100,
     },
@@ -1204,76 +1110,5 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '600'
-    },
-    // Action Sheet Styles
-    actionSheetContainer: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-    },
-    actionSheetHeader: {
-        paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 20,
-        alignItems: 'center',
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-    },
-    actionSheetHandle: {
-        width: 40,
-        height: 4,
-        backgroundColor: '#D1D5DB',
-        borderRadius: 2,
-        marginBottom: 16,
-    },
-    actionSheetTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#111827',
-        marginBottom: 4,
-    },
-    actionSheetSubtitle: {
-        fontSize: 14,
-        color: '#6B7280',
-        textAlign: 'center',
-    },
-    actionSheetContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 20,
-    },
-    actionSheetItem: {
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-    },
-    actionSheetItemLast: {
-        borderBottomWidth: 0,
-    },
-    actionSheetItemDestructive: {
-        // Additional styling for destructive items if needed
-    },
-    actionSheetItemContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    actionSheetItemIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#EEF2FF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 16,
-    },
-    actionSheetItemIconDestructive: {
-        backgroundColor: '#FEF2F2',
-    },
-    actionSheetItemText: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#111827',
-    },
-    actionSheetItemTextDestructive: {
-        color: '#EF4444',
     },
 });

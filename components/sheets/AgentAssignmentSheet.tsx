@@ -53,7 +53,7 @@ export default function AgentAssignmentSheet({
   const fetchAvailableAgents = async () => {
     setLoading(true);
     try {
-      const result = await apiService.get(`/orders/${serviceRequestId}/available-agents`);
+      const result = await apiService.get(`/service-requests/${serviceRequestId}/available-agents`);
       console.log('Available service agents:', result.data?.availableAgents);
       
       if (result.success && result.data?.availableAgents) {
@@ -88,7 +88,7 @@ export default function AgentAssignmentSheet({
 
     setAssigning(true);
     try {
-      const result = await apiService.post(`/service-requests/${serviceRequestId}/assign-agent`, {
+      const result = await apiService.patch(`/service-requests/${serviceRequestId}/assign-agent`, {
         serviceAgentId: selectedAgentId
       });
 
@@ -122,7 +122,7 @@ export default function AgentAssignmentSheet({
           onPress: async () => {
             setAssigning(true);
             try {
-              const result = await apiService.post(`/service-requests/${serviceRequestId}/unassign-agent`);
+              const result = await apiService.patch(`/service-requests/${serviceRequestId}/unassign-agent`);
               
               if (result.success) {
                 onAgentAssigned({ id: '', name: '', phone: '' }); // Clear assignment
