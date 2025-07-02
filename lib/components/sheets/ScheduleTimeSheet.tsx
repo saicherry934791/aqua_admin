@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -17,6 +18,8 @@ interface ScheduleTimeSheetProps extends SheetProps {
   currentScheduledDate?: string;
   onScheduleUpdated: (scheduledDate: string | null) => void;
 }
+
+const { height: screenHeight } = Dimensions.get('window');
 
 export default function ScheduleTimeSheet({ 
   sheetId, 
@@ -184,7 +187,7 @@ export default function ScheduleTimeSheet({
   return (
     <ActionSheet
       id={sheetId}
-      snapPoints={[85]}
+      snapPoints={[100]}
       initialSnapIndex={0}
       gestureEnabled={true}
       closeOnTouchBackdrop={true}
@@ -335,11 +338,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    minHeight: screenHeight ,
   },
   container: {
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    maxHeight: screenHeight ,
+    minHeight: screenHeight * 0.7,
   },
   header: {
     flexDirection: 'row',

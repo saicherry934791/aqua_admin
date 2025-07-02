@@ -1,8 +1,8 @@
 import { registerSheet } from 'react-native-actions-sheet';
 import DateRangeSheet from "./lib/components/sheets/DateRangeSheet";
 import SelectSheet from "./lib/components/sheets/SelectSheet";
-import AgentAssignmentSheet from "./components/sheets/AgentAssignmentSheet";
-import ScheduleTimeSheet from "./components/sheets/ScheduleTimeSheet";
+import AgentAssignmentSheet from "./lib/components/sheets/AgentAssignmentSheet";
+import ScheduleTimeSheet from "./lib/components/sheets/ScheduleTimeSheet";
 
 registerSheet('select-sheet', SelectSheet);
 registerSheet('date-range-sheet', DateRangeSheet);

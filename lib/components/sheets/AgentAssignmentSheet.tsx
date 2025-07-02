@@ -7,10 +7,13 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ActionSheet, { SheetManager, SheetProps } from 'react-native-actions-sheet';
 import { apiService } from '@/lib/api/api';
+
+const { height: screenHeight } = Dimensions.get('window');
 
 interface ServiceAgent {
   id: string;
@@ -25,6 +28,7 @@ interface AgentAssignmentSheetProps extends SheetProps {
   serviceRequestId: string;
   currentAgentId?: string;
   currentAgentName?: string;
+  orderId:string;
   onAgentAssigned: (agent: ServiceAgent) => void;
 }
 
@@ -36,7 +40,8 @@ export default function AgentAssignmentSheet({
     serviceRequestId, 
     currentAgentId, 
     currentAgentName, 
-    onAgentAssigned 
+    onAgentAssigned ,
+    orderId
   } = payload || {};
 
   const [agents, setAgents] = useState<ServiceAgent[]>([]);
@@ -53,7 +58,7 @@ export default function AgentAssignmentSheet({
   const fetchAvailableAgents = async () => {
     setLoading(true);
     try {
-      const result = await apiService.get(`/service-requests/${serviceRequestId}/available-agents`);
+      const result = await apiService.get(`/orders/${orderId}/available-agents`);
       console.log('Available service agents:', result.data?.availableAgents);
       
       if (result.success && result.data?.availableAgents) {
@@ -88,8 +93,8 @@ export default function AgentAssignmentSheet({
 
     setAssigning(true);
     try {
-      const result = await apiService.patch(`/service-requests/${serviceRequestId}/assign-agent`, {
-        serviceAgentId: selectedAgentId
+      const result = await apiService.patch(`/service-requests/${serviceRequestId}/assign`, {
+        assignedToId: selectedAgentId
       });
 
       if (result.success) {
@@ -213,107 +218,121 @@ export default function AgentAssignmentSheet({
   return (
     <ActionSheet
       id={sheetId}
-      snapPoints={[80]}
+      // Fix 1: Use multiple snap points for better control
+      snapPoints={[70, 90]} // 70% and 90% of screen height
       initialSnapIndex={0}
       gestureEnabled={true}
       closeOnTouchBackdrop={true}
+      // Fix 2: Add proper container styling with height constraints
       containerStyle={styles.actionSheetContainer}
+      // Fix 3: Add these additional props for better behavior
+      drawUnderStatusBar={false}
+      statusBarTranslucent={false}
+      defaultOverlayOpacity={0.3}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {currentAgentId ? 'Reassign Agent' : 'Assign Agent'}
-          </Text>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => SheetManager.hide(sheetId)}
-          >
-            <Ionicons name="close" size={24} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Current Assignment Info */}
-        {currentAgentId && currentAgentName && (
-          <View style={styles.currentAssignmentInfo}>
-            <Text style={styles.currentAssignmentLabel}>Currently Assigned:</Text>
-            <Text style={styles.currentAssignmentName}>{currentAgentName}</Text>
+      {/* Fix 4: Wrap content in a container with proper height */}
+      <View style={styles.sheetContent}>
+        {/* Header with drag indicator */}
+        <View style={styles.dragIndicator} />
+        
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>
+              {currentAgentId ? 'Reassign Agent' : 'Assign Agent'}
+            </Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => SheetManager.hide(sheetId)}
+            >
+              <Ionicons name="close" size={24} color="#6B7280" />
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* Loading State */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#3B82F6" />
-            <Text style={styles.loadingText}>Loading available agents...</Text>
-          </View>
-        ) : (
-          <>
-            {/* Agents List */}
-            <View style={styles.agentsContainer}>
-              <Text style={styles.sectionTitle}>Available Agents</Text>
-              
-              {agents.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="people" size={48} color="#9CA3AF" />
-                  <Text style={styles.emptyTitle}>No Agents Available</Text>
-                  <Text style={styles.emptySubtitle}>
-                    There are no agents available for assignment at this time
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={agents}
-                  renderItem={renderAgentItem}
-                  keyExtractor={(item) => item.id}
-                  style={styles.agentsList}
-                  showsVerticalScrollIndicator={false}
-                />
-              )}
+          {/* Current Assignment Info */}
+          {currentAgentId && currentAgentName && (
+            <View style={styles.currentAssignmentInfo}>
+              <Text style={styles.currentAssignmentLabel}>Currently Assigned:</Text>
+              <Text style={styles.currentAssignmentName}>{currentAgentName}</Text>
             </View>
+          )}
 
-            {/* Action Buttons */}
-            <View style={styles.actionButtons}>
-              {currentAgentId && (
+          {/* Loading State */}
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+              <Text style={styles.loadingText}>Loading available agents...</Text>
+            </View>
+          ) : (
+            <>
+              {/* Agents List */}
+              <View style={styles.agentsContainer}>
+                <Text style={styles.sectionTitle}>Available Agents</Text>
+                
+                {agents.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="people" size={48} color="#9CA3AF" />
+                    <Text style={styles.emptyTitle}>No Agents Available</Text>
+                    <Text style={styles.emptySubtitle}>
+                      There are no agents available for assignment at this time
+                    </Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={agents}
+                    renderItem={renderAgentItem}
+                    keyExtractor={(item) => item.id}
+                    style={styles.agentsList}
+                    showsVerticalScrollIndicator={false}
+                    // Fix 5: Add max height to prevent overflow
+                    contentContainerStyle={styles.agentsListContent}
+                  />
+                )}
+              </View>
+
+              {/* Action Buttons */}
+              <View style={styles.actionButtons}>
+                {currentAgentId && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.unassignButton]}
+                    onPress={handleUnassignAgent}
+                    disabled={assigning}
+                  >
+                    {assigning ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <>
+                        <Ionicons name="person-remove" size={20} color="#EF4444" />
+                        <Text style={styles.unassignButtonText}>Unassign Current</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+                
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.unassignButton]}
-                  onPress={handleUnassignAgent}
-                  disabled={assigning}
+                  style={[
+                    styles.actionButton,
+                    styles.assignButton,
+                    (!selectedAgentId || assigning) && styles.disabledButton
+                  ]}
+                  onPress={handleAssignAgent}
+                  disabled={!selectedAgentId || assigning}
                 >
                   {assigning ? (
-                    <ActivityIndicator size="small" color="#EF4444" />
+                    <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <>
-                      <Ionicons name="person-remove" size={20} color="#EF4444" />
-                      <Text style={styles.unassignButtonText}>Unassign Current</Text>
+                      <Ionicons name="person-add" size={20} color="#FFFFFF" />
+                      <Text style={styles.assignButtonText}>
+                        {currentAgentId ? 'Reassign Agent' : 'Assign Agent'}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
-              )}
-              
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  styles.assignButton,
-                  (!selectedAgentId || assigning) && styles.disabledButton
-                ]}
-                onPress={handleAssignAgent}
-                disabled={!selectedAgentId || assigning}
-              >
-                {assigning ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="person-add" size={20} color="#FFFFFF" />
-                    <Text style={styles.assignButtonText}>
-                      {currentAgentId ? 'Reassign Agent' : 'Assign Agent'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+              </View>
+            </>
+          )}
+        </View>
       </View>
     </ActionSheet>
   );
@@ -324,6 +343,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    // Fix 6: Ensure minimum height
+    minHeight: screenHeight * 0.7,
+  },
+  // Fix 7: New wrapper for proper height management
+  sheetContent: {
+    flex: 1,
+    maxHeight: screenHeight * 0.9,
+    minHeight: screenHeight * 0.7,
+  },
+  // Fix 8: Add drag indicator
+  dragIndicator: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#D1D5DB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
   },
   container: {
     flex: 1,
@@ -334,7 +371,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
@@ -370,6 +407,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
+    minHeight: 200,
   },
   loadingText: {
     fontSize: 16,
@@ -379,6 +417,7 @@ const styles = StyleSheet.create({
   },
   agentsContainer: {
     flex: 1,
+    minHeight: 300, // Fix 9: Ensure minimum height for agents container
   },
   sectionTitle: {
     fontSize: 16,
@@ -388,6 +427,12 @@ const styles = StyleSheet.create({
   },
   agentsList: {
     flex: 1,
+    // Fix 10: Set max height to prevent overflow
+    maxHeight: screenHeight * 0.4,
+  },
+  // Fix 11: Add content container style for FlatList
+  agentsListContent: {
+    paddingBottom: 10,
   },
   agentItem: {
     flexDirection: 'row',
@@ -467,6 +512,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingVertical: 40,
+    minHeight: 200, // Fix 12: Ensure minimum height for empty state
   },
   emptyTitle: {
     fontSize: 18,
@@ -487,6 +533,8 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
+    // Fix 13: Ensure buttons are always visible
+    minHeight: 70,
   },
   actionButton: {
     flex: 1,

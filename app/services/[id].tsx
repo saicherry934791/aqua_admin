@@ -229,6 +229,7 @@ const ServiceDetailScreen = () => {
                 serviceRequestId: id,
                 currentAgentId: serviceRequest?.assignedToId,
                 currentAgentName: serviceRequest?.assignedToName,
+                orderId : serviceRequest?.orderId,
                 onAgentAssigned: (agent: { id: string; name: string; phone: string }) => {
                     if (serviceRequest) {
                         setServiceRequest({
