@@ -1,6 +1,6 @@
 import { Button } from '@react-navigation/elements';
 import { router, useNavigation } from 'expo-router';
-import { LocationEdit as Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity } from 'lucide-react-native';
+import { LocationEdit as Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity, BarChart3, PieChart } from 'lucide-react-native';
 import React, { useContext, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
@@ -180,28 +180,26 @@ export default function DashboardScreen() {
     });
   };
 
-  // Get tabs based on user role
+  // Get tabs based on user role - Generalized structure
   const getTabs = () => {
     switch (user?.role) {
       case UserRole.ADMIN:
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
-          { key: 'finance', title: 'Finance', icon: DollarSign },
-          { key: 'operations', title: 'Operations', icon: Package },
-          { key: 'analytics', title: 'Analytics', icon: TrendingUp }
+          { key: 'trends', title: 'Trends', icon: BarChart3 },
+          { key: 'finance', title: 'Finance', icon: DollarSign }
         ];
       case UserRole.FRANCHISE_OWNER:
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
-          { key: 'orders', title: 'Orders', icon: Package },
-          { key: 'customers', title: 'Customers', icon: Users },
-          { key: 'performance', title: 'Performance', icon: TrendingUp }
+          { key: 'trends', title: 'Trends', icon: BarChart3 },
+          { key: 'finance', title: 'Finance', icon: DollarSign }
         ];
       case UserRole.SERVICE_AGENT:
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
-          { key: 'tasks', title: 'My Tasks', icon: Wrench },
-          { key: 'schedule', title: 'Schedule', icon: Calendar }
+          { key: 'trends', title: 'Trends', icon: BarChart3 },
+          { key: 'tasks', title: 'My Tasks', icon: Wrench }
         ];
       default:
         return [{ key: 'overview', title: 'Overview', icon: Activity }];
@@ -212,7 +210,6 @@ export default function DashboardScreen() {
   const renderDashboardContent = () => {
     const userRole = user?.role;
 
-    console.log('not access ',user)
     if (userRole === UserRole.ADMIN) {
       return renderAdminContent();
     } else if (userRole === UserRole.FRANCHISE_OWNER) {
@@ -268,21 +265,6 @@ export default function DashboardScreen() {
               />
             </View>
 
-            {/* Charts Section */}
-            <View style={styles.chartsSection}>
-              <DistributionPieChart
-                data={pieChartData}
-                title="Order Distribution"
-                height={200}
-              />
-              <View style={styles.chartSpacing} />
-              <ComparisonLineChart
-                data={lineChartData}
-                title="Revenue & Orders Trend"
-                height={220}
-              />
-            </View>
-
             {/* Quick Actions */}
             <View style={styles.quickActionsSection}>
               <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -309,6 +291,32 @@ export default function DashboardScreen() {
           </View>
         );
 
+      case 'trends':
+        return (
+          <View style={styles.contentContainer}>
+            {/* Charts Section */}
+            <View style={styles.chartsSection}>
+              <DistributionPieChart
+                data={pieChartData}
+                title="Order Distribution"
+                height={200}
+              />
+              <View style={styles.chartSpacing} />
+              <ComparisonLineChart
+                data={lineChartData}
+                title="Revenue & Orders Trend"
+                height={220}
+              />
+              <View style={styles.chartSpacing} />
+              <ComparisonBarChart
+                data={barChartData}
+                title="Performance by Category"
+                height={220}
+              />
+            </View>
+          </View>
+        );
+
       case 'finance':
         return (
           <View style={styles.contentContainer}>
@@ -323,34 +331,11 @@ export default function DashboardScreen() {
               title="Revenue by Category"
               height={220}
             />
-          </View>
-        );
-
-      case 'operations':
-        return (
-          <View style={styles.contentContainer}>
-            <View style={styles.statsGrid}>
-              <StatCard title="Active Products" value="25" icon={Package} />
-              <StatCard title="Total Users" value="1,250" icon={Users} />
-              <StatCard title="Pending Services" value="45" icon={Wrench} />
-              <StatCard title="System Alerts" value="3" icon={Bell} />
-            </View>
-          </View>
-        );
-
-      case 'analytics':
-        return (
-          <View style={styles.contentContainer}>
+            <View style={styles.chartSpacing} />
             <ComparisonLineChart
               data={lineChartData}
-              title="Performance Analytics"
+              title="Financial Trends"
               height={220}
-            />
-            <View style={styles.chartSpacing} />
-            <DistributionPieChart
-              data={pieChartData}
-              title="User Distribution"
-              height={200}
             />
           </View>
         );
@@ -396,12 +381,6 @@ export default function DashboardScreen() {
               />
             </View>
 
-            <ComparisonLineChart
-              data={lineChartData}
-              title="Franchise Performance"
-              height={220}
-            />
-
             <View style={styles.quickActionsSection}>
               <Text style={styles.sectionTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
@@ -427,47 +406,49 @@ export default function DashboardScreen() {
           </View>
         );
 
-      case 'orders':
+      case 'trends':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.chartsSection}>
+              <DistributionPieChart
+                data={pieChartData}
+                title="Customer Distribution"
+                height={200}
+              />
+              <View style={styles.chartSpacing} />
+              <ComparisonLineChart
+                data={lineChartData}
+                title="Franchise Performance"
+                height={220}
+              />
+              <View style={styles.chartSpacing} />
+              <ComparisonBarChart
+                data={barChartData}
+                title="Service Categories"
+                height={220}
+              />
+            </View>
+          </View>
+        );
+
+      case 'finance':
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
               <StatCard title="Total Orders" value="156" icon={Package} />
-              <StatCard title="Pending" value="23" icon={Calendar} />
-              <StatCard title="Completed" value="120" icon={Activity} />
-              <StatCard title="Cancelled" value="13" icon={Bell} />
+              <StatCard title="Order Revenue" value="₹45K" icon={DollarSign} color="#10B981" />
+              <StatCard title="Service Revenue" value="₹12K" icon={Wrench} color="#8B5CF6" />
+              <StatCard title="Monthly Growth" value="+15%" icon={TrendingUp} color="#F59E0B" />
             </View>
-            <DistributionPieChart
-              data={pieChartData}
-              title="Order Status Distribution"
-              height={200}
-            />
-          </View>
-        );
-
-      case 'customers':
-        return (
-          <View style={styles.contentContainer}>
-            <View style={styles.statsGrid}>
-              <StatCard title="Total Customers" value="89" icon={Users} />
-              <StatCard title="Active Rentals" value="34" icon={Activity} />
-              <StatCard title="New This Month" value="12" icon={TrendingUp} />
-              <StatCard title="Service Requests" value="8" icon={Wrench} />
-            </View>
-          </View>
-        );
-
-      case 'performance':
-        return (
-          <View style={styles.contentContainer}>
-            <ComparisonBarChart
-              data={barChartData}
-              title="Performance Metrics"
+            <ComparisonLineChart
+              data={lineChartData}
+              title="Revenue Trends"
               height={220}
             />
             <View style={styles.chartSpacing} />
-            <ComparisonLineChart
-              data={lineChartData}
-              title="Monthly Trends"
+            <ComparisonBarChart
+              data={barChartData}
+              title="Revenue Sources"
               height={220}
             />
           </View>
@@ -532,6 +513,25 @@ export default function DashboardScreen() {
           </View>
         );
 
+      case 'trends':
+        return (
+          <View style={styles.contentContainer}>
+            <View style={styles.chartsSection}>
+              <DistributionPieChart
+                data={pieChartData}
+                title="Task Distribution"
+                height={200}
+              />
+              <View style={styles.chartSpacing} />
+              <ComparisonLineChart
+                data={lineChartData}
+                title="Weekly Performance"
+                height={220}
+              />
+            </View>
+          </View>
+        );
+
       case 'tasks':
         return (
           <View style={styles.contentContainer}>
@@ -541,17 +541,25 @@ export default function DashboardScreen() {
               <StatCard title="Overdue" value="2" icon={Bell} />
               <StatCard title="Completed" value="35" icon={TrendingUp} />
             </View>
-          </View>
-        );
-
-      case 'schedule':
-        return (
-          <View style={styles.contentContainer}>
-            <View style={styles.statsGrid}>
-              <StatCard title="Today" value="8" icon={Calendar} />
-              <StatCard title="Tomorrow" value="6" icon={Calendar} />
-              <StatCard title="This Week" value="32" icon={Calendar} />
-              <StatCard title="Available Slots" value="12" icon={Activity} />
+            
+            <View style={styles.quickActionsSection}>
+              <Text style={styles.sectionTitle}>Task Management</Text>
+              <View style={styles.quickActionsGrid}>
+                <QuickActionCard
+                  title="Service Requests"
+                  subtitle="View all assignments"
+                  icon={Wrench}
+                  color="#007bff"
+                  onPress={() => router.push('/service')}
+                />
+                <QuickActionCard
+                  title="Schedule"
+                  subtitle="Check today's schedule"
+                  icon={Calendar}
+                  color="#10B981"
+                  onPress={() => router.push('/schedule')}
+                />
+              </View>
             </View>
           </View>
         );
