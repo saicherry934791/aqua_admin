@@ -1,6 +1,6 @@
 import { Button } from '@react-navigation/elements';
 import { router, useNavigation } from 'expo-router';
-import { LocationEdit as Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity, BarChart3, PieChart } from 'lucide-react-native';
+import { LocationEdit as Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity, ChartBar as BarChart3, ChartPie as PieChart } from 'lucide-react-native';
 import React, { useContext, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
