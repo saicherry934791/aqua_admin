@@ -1,9 +1,9 @@
 import { useAuth } from '@/lib/contexts/AuthContext';
-import { router, useNavigation, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
-    Alert,
     ActivityIndicator,
+    Alert,
     StyleSheet,
     Text,
     TextInput,
@@ -104,7 +104,7 @@ const OTPScreen = () => {
                     inputRefs.current[0]?.focus();
                 }
             } catch (error: any) {
-                console.error('OTP verification error:', error);
+                console.log('OTP verification error:', error);
                 Alert.alert('Error', error.message || 'OTP verification failed. Please try again.');
                 // Clear OTP on error
                 setOtp(['', '', '', '', '', '']);

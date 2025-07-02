@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  Alert,
-} from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { apiService } from '@/lib/api/api';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
 
 interface Notification {
   id: string;
@@ -119,7 +118,7 @@ const NotificationsScreen = () => {
         setNotifications(result?.data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      console.log('Failed to fetch notifications:', error);
       setNotifications(mockNotifications); // Fallback to mock data
     }
     setLoading(false);
@@ -140,7 +139,7 @@ const NotificationsScreen = () => {
         )
       );
     } catch (error) {
-      console.error('Failed to mark notification as read:', error);
+      console.log('Failed to mark notification as read:', error);
       // Update locally anyway for better UX
       setNotifications(prev =>
         prev.map(notif =>
@@ -157,7 +156,7 @@ const NotificationsScreen = () => {
         prev.map(notif => ({ ...notif, isRead: true }))
       );
     } catch (error) {
-      console.error('Failed to mark all notifications as read:', error);
+      console.log('Failed to mark all notifications as read:', error);
       // Update locally anyway
       setNotifications(prev =>
         prev.map(notif => ({ ...notif, isRead: true }))

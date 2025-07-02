@@ -2,10 +2,12 @@ import { useRouter } from 'expo-router';
 import React, { useContext, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 export default function ProfileScreen() {
 
   const router = useRouter();
+  const {logout} = useAuth()
 
   // Sample user data (would typically come from authentication context/state management)
   const [userData] = useState({
@@ -34,9 +36,7 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     // Reset user type to guest
    
-    await AsyncStorage.clear()
-    // Navigate to login screen
-    router.replace('/(auth)/login');
+    await logout();
    
     
   };

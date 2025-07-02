@@ -2,11 +2,11 @@
 import { apiService } from '@/lib/api/api';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '@/lib/contexts/AuthContext';
 
 type FilterType = 'all' | 'active' | 'pending' | 'company' | 'franchised';
 
@@ -38,7 +38,7 @@ const FranchiseScreen = () => {
         // Clear the refresh data parameter
         router.setParams({ refreshData: undefined });
       } catch (error) {
-        console.error('Error parsing refresh data:', error);
+        console.log('Error parsing refresh data:', error);
       }
     }
   }, [refreshData]);
@@ -85,7 +85,7 @@ const FranchiseScreen = () => {
         setTotalRevenue(0);
       }
     } catch (err) {
-      console.error('Failed to fetch franchises:', err);
+      console.log('Failed to fetch franchises:', err);
       setFranchises([]);
       setTotalRevenue(0);
     } finally {

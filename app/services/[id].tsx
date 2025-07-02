@@ -1,17 +1,18 @@
 import { apiService } from '@/lib/api/api';
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
+    Linking,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
-    Alert,
-    Linking,
-    ActivityIndicator,
-    RefreshControl
+    View
 } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
 
@@ -57,6 +58,7 @@ const ServiceDetailScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [updating, setUpdating] = useState(false);
+    const { user } = useAuth()
 
     const fetchServiceRequest = async () => {
         setLoading(true);
@@ -68,7 +70,7 @@ const ServiceDetailScreen = () => {
             }
             const data = result.data.serviceRequest;
             console.log('Service request data:', data);
-            
+
             setServiceRequest({
                 id: data.id,
                 customerId: data.customer.id,
@@ -95,7 +97,7 @@ const ServiceDetailScreen = () => {
             });
 
         } catch (error) {
-            console.error('Failed to fetch service request:', error);
+            console.log('Failed to fetch service request:', error);
             Alert.alert('Error', 'Failed to load service request details');
         }
         setLoading(false);
@@ -113,17 +115,17 @@ const ServiceDetailScreen = () => {
 
     const getStatusColor = (status: ServiceRequestStatus) => {
         switch (status) {
-            case ServiceRequestStatus.CREATED: 
+            case ServiceRequestStatus.CREATED:
                 return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
-            case ServiceRequestStatus.ASSIGNED: 
+            case ServiceRequestStatus.ASSIGNED:
                 return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6', border: '#C4B5FD' };
-            case ServiceRequestStatus.IN_PROGRESS: 
+            case ServiceRequestStatus.IN_PROGRESS:
                 return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B', border: '#FDE68A' };
-            case ServiceRequestStatus.COMPLETED: 
+            case ServiceRequestStatus.COMPLETED:
                 return { bg: '#D1FAE5', text: '#047857', dot: '#059669', border: '#6EE7B7' };
-            case ServiceRequestStatus.CANCELLED: 
+            case ServiceRequestStatus.CANCELLED:
                 return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444', border: '#FECACA' };
-            default: 
+            default:
                 return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
         }
     };
@@ -190,23 +192,23 @@ const ServiceDetailScreen = () => {
     const updateServiceStatus = async (newStatus: ServiceRequestStatus) => {
         setUpdating(true);
         try {
-            const result = await apiService.patch(`/service-requests/${id}/status`, { 
-                status: newStatus 
+            const result = await apiService.patch(`/service-requests/${id}/status`, {
+                status: newStatus
             });
-            
+
             if (result.success) {
                 setServiceRequest(prev => prev ? {
                     ...prev,
                     status: newStatus,
                     updatedAt: new Date().toISOString()
                 } : null);
-                
+
                 Alert.alert('Success', `Service request ${getStatusDisplayName(newStatus)}`);
             } else {
                 throw new Error(result.error || 'Failed to update status');
             }
         } catch (error) {
-            console.error('Failed to update service request:', error);
+            console.log('Failed to update service request:', error);
             Alert.alert('Error', 'Failed to update service request');
         }
         setUpdating(false);
@@ -229,7 +231,7 @@ const ServiceDetailScreen = () => {
                 serviceRequestId: id,
                 currentAgentId: serviceRequest?.assignedToId,
                 currentAgentName: serviceRequest?.assignedToName,
-                orderId : serviceRequest?.orderId,
+                orderId: serviceRequest?.orderId,
                 onAgentAssigned: (agent: { id: string; name: string; phone: string }) => {
                     if (serviceRequest) {
                         setServiceRequest({
@@ -298,7 +300,7 @@ const ServiceDetailScreen = () => {
 
     const showStatusActionSheet = () => {
         const availableActions = getAvailableActions();
-        
+
         if (availableActions.length === 0) {
             Alert.alert('No Actions', 'No status updates available for this service request.');
             return;
@@ -477,19 +479,21 @@ const ServiceDetailScreen = () => {
                                     <Text style={styles.agentStatus}>Assigned Agent</Text>
                                 </View>
                             </View>
-                            
-                            <View style={styles.agentActions}>
-                                <TouchableOpacity
-                                    style={styles.agentActionButton}
-                                    onPress={handleAssignAgent}
-                                >
-                                    <Ionicons name="swap-horizontal" size={16} color="#3B82F6" />
-                                    <Text style={styles.agentActionText}>Reassign</Text>
-                                </TouchableOpacity>
-                            </View>
+
+                            {
+                                user?.role !== UserRole.SERVICE_AGENT && <View style={styles.agentActions}>
+                                    <TouchableOpacity
+                                        style={styles.agentActionButton}
+                                        onPress={handleAssignAgent}
+                                    >
+                                        <Ionicons name="swap-horizontal" size={16} color="#3B82F6" />
+                                        <Text style={styles.agentActionText}>Reassign</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            }
                         </View>
                     ) : (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.noAgentSection}
                             onPress={handleAssignAgent}
                         >
@@ -522,7 +526,7 @@ const ServiceDetailScreen = () => {
                                     <Text style={styles.scheduleStatus}>Scheduled</Text>
                                 </View>
                             </View>
-                            
+
                             <View style={styles.scheduleActions}>
                                 <TouchableOpacity
                                     style={styles.scheduleActionButton}
@@ -534,7 +538,7 @@ const ServiceDetailScreen = () => {
                             </View>
                         </View>
                     ) : (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.noScheduleSection}
                             onPress={handleScheduleTime}
                         >

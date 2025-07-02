@@ -3,13 +3,13 @@ import { CustomerType, useAuth } from '@/lib/contexts/AuthContext';
 import { useNavigation } from 'expo-router';
 import React, { useLayoutEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    Alert
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 const Login = () => {
@@ -74,7 +74,7 @@ const Login = () => {
                 Alert.alert('Error', result.error || 'Failed to verify user. Please try again.');
             }
         } catch (error) {
-            console.error('Failed to send OTP:', error);
+            console.log('Failed to send OTP:', error);
             Alert.alert('Error', 'Failed to send OTP. Please check your connection and try again.');
         } finally {
             setIsLoading(false);

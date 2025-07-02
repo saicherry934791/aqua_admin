@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Dimensions,
-} from 'react-native';
+import { apiService } from '@/lib/api/api';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import ActionSheet, { SheetManager, SheetProps } from 'react-native-actions-sheet';
-import { apiService } from '@/lib/api/api';
 
 interface ScheduleTimeSheetProps extends SheetProps {
   serviceRequestId: string;
@@ -80,7 +80,7 @@ export default function ScheduleTimeSheet({
         throw new Error(result.error || 'Failed to schedule service');
       }
     } catch (error: any) {
-      console.error('Failed to schedule service:', error);
+      console.log('Failed to schedule service:', error);
       Alert.alert('Error', error.message || 'Failed to schedule service');
     } finally {
       setUpdating(false);
@@ -111,7 +111,7 @@ export default function ScheduleTimeSheet({
                 throw new Error(result.error || 'Failed to clear schedule');
               }
             } catch (error: any) {
-              console.error('Failed to clear schedule:', error);
+              console.log('Failed to clear schedule:', error);
               Alert.alert('Error', error.message || 'Failed to clear schedule');
             } finally {
               setUpdating(false);

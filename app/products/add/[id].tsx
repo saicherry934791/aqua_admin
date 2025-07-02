@@ -1,9 +1,9 @@
 import { apiService } from "@/lib/api/api"
+import { router, useLocalSearchParams } from "expo-router"
 import React, { useEffect, useState } from "react"
-import { Alert, StatusBar, Text ,StyleSheet} from "react-native"
+import { Alert, StatusBar, StyleSheet, Text } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
-import { router, useLocalSearchParams } from "expo-router"
 
 const ProductFormScreen = () => {
 
@@ -135,7 +135,7 @@ const ProductFormScreen = () => {
             }
 
         } catch (error) {
-            console.error("Submit Error:", error)
+            console.log("Submit Error:", error)
             Alert.alert("Error", "Failed to submit the form")
         }
     }

@@ -1,17 +1,17 @@
+import { apiService } from '@/lib/api/api';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
   ActivityIndicator,
   Alert,
   Dimensions,
+  FlatList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import ActionSheet, { SheetManager, SheetProps } from 'react-native-actions-sheet';
-import { apiService } from '@/lib/api/api';
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -67,7 +67,7 @@ export default function AgentAssignmentSheet({
         setAgents([]);
       }
     } catch (error) {
-      console.error('Failed to fetch service agents:', error);
+      console.log('Failed to fetch service agents:', error);
       Alert.alert('Error', 'Failed to load available agents');
       setAgents([]);
     } finally {
@@ -108,7 +108,7 @@ export default function AgentAssignmentSheet({
         throw new Error(result.error || 'Failed to assign agent');
       }
     } catch (error: any) {
-      console.error('Failed to assign agent:', error);
+      console.log('Failed to assign agent:', error);
       Alert.alert('Error', error.message || 'Failed to assign agent');
     } finally {
       setAssigning(false);
@@ -137,7 +137,7 @@ export default function AgentAssignmentSheet({
                 throw new Error(result.error || 'Failed to unassign agent');
               }
             } catch (error: any) {
-              console.error('Failed to unassign agent:', error);
+              console.log('Failed to unassign agent:', error);
               Alert.alert('Error', error.message || 'Failed to unassign agent');
             } finally {
               setAssigning(false);

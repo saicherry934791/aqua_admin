@@ -53,7 +53,7 @@ const ServiceRequestsScreen = () => {
                 setServiceRequests(data);
             }
         } catch (error) {
-            console.error('Failed to fetch service requests:', error);
+            console.log('Failed to fetch service requests:', error);
         }
         setLoading(false);
         setRefreshing(false);

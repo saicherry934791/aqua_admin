@@ -1,19 +1,20 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Alert,
-  Linking,
-  StatusBar,
-} from 'react-native';
+import { apiService } from '@/lib/api/api';
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Alert,
+  Image,
+  Linking,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import ActionSheet, { ActionSheetRef } from 'react-native-actions-sheet';
-import { apiService } from '@/lib/api/api';
 
 // Backend enums - use exact values from backend
 export enum OrderStatus {
@@ -73,6 +74,7 @@ export const OrderDetailsScreen = () => {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [serviceAgents, setServiceAgents] = useState<ServiceAgent[]>([]);
+  const { user } = useAuth()
 
   const statusActionSheetRef = useRef<ActionSheetRef>(null);
   const agentActionSheetRef = useRef<ActionSheetRef>(null);
@@ -123,7 +125,7 @@ export const OrderDetailsScreen = () => {
       }
 
     } catch (error) {
-      console.error('Failed to fetch order details:', error);
+      console.log('Failed to fetch order details:', error);
       Alert.alert('Error', 'Failed to load order details');
     }
     setLoading(false);
@@ -132,14 +134,14 @@ export const OrderDetailsScreen = () => {
   const fetchServiceAgents = async () => {
     try {
       const result = await apiService.get(`orders/${id}/available-agents`);
-      console.log('avilable service agents ',result.data.availableAgents)
+      console.log('avilable service agents ', result.data.availableAgents)
       const data = result?.data || [];
 
-     
-        setServiceAgents(data.availableAgents);
-      
+
+      setServiceAgents(data.availableAgents);
+
     } catch (error) {
-      console.error('Failed to fetch service agents:', error);
+      console.log('Failed to fetch service agents:', error);
     }
   };
 
@@ -151,14 +153,14 @@ export const OrderDetailsScreen = () => {
   const handleStatusUpdate = async (newStatus: OrderStatus) => {
     try {
       const result = await apiService.patch(`/orders/${id}/status`, { status: newStatus });
-      
+
       // Refetch order details to get updated data
       await fetchOrderDetails();
-      
+
       statusActionSheetRef.current?.hide();
       Alert.alert('Success', `Order status updated to ${getStatusDisplayName(newStatus)}`);
     } catch (error) {
-      console.error('Failed to update order status:', error);
+      console.log('Failed to update order status:', error);
       Alert.alert('Error', 'Failed to update order status');
     }
   };
@@ -166,14 +168,14 @@ export const OrderDetailsScreen = () => {
   const handleAgentAssignment = async (agentId: string, agentName: string, agentPhone: string) => {
     try {
       const result = await apiService.post(`/orders/${id}/assign-agent`, { serviceAgentId: agentId });
-      
+
       // Refetch order details to get updated data
       await fetchOrderDetails();
-      
+
       agentActionSheetRef.current?.hide();
       Alert.alert('Success', `Agent ${agentName} assigned to order`);
     } catch (error) {
-      console.error('Failed to assign agent:', error);
+      console.log('Failed to assign agent:', error);
       Alert.alert('Error', 'Failed to assign agent');
     }
   };
@@ -181,14 +183,14 @@ export const OrderDetailsScreen = () => {
   const handlePaymentUpdate = async (status: PaymentStatus) => {
     try {
       const result = await apiService.put(`/orders/${id}/payment`, { paymentStatus: status });
-      
+
       // Refetch order details to get updated data
       await fetchOrderDetails();
-      
+
       paymentActionSheetRef.current?.hide();
       Alert.alert('Success', `Payment status updated to ${getPaymentStatusDisplayName(status)}`);
     } catch (error) {
-      console.error('Failed to update payment status:', error);
+      console.log('Failed to update payment status:', error);
       Alert.alert('Error', 'Failed to update payment status');
     }
   };
@@ -344,7 +346,7 @@ export const OrderDetailsScreen = () => {
 
             <TouchableOpacity
               style={[styles.paymentBadge, { backgroundColor: paymentColors.bg }]}
-              onPress={() => paymentActionSheetRef.current?.show()}
+              onPress={() => user?.role === UserRole.SERVICE_AGENT ? () => { } : paymentActionSheetRef.current?.show()}
             >
               <Text style={[styles.paymentText, { color: paymentColors.text }]}>
                 {getPaymentStatusDisplayName(order.paymentStatus)}
@@ -449,15 +451,18 @@ export const OrderDetailsScreen = () => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Service Agent</Text>
-            <TouchableOpacity
-              style={styles.assignButton}
-              onPress={() => agentActionSheetRef.current?.show()}
-            >
-              <Ionicons name="person-add" size={14} color="#3B82F6" />
-              <Text style={styles.assignButtonText}>
-                {order.serviceAgentName ? 'Change' : 'Assign'}
-              </Text>
-            </TouchableOpacity>
+            {
+              user?.role !== UserRole.SERVICE_AGENT && <TouchableOpacity
+                style={styles.assignButton}
+                onPress={() => agentActionSheetRef.current?.show()}
+              >
+                <Ionicons name="person-add" size={14} color="#3B82F6" />
+                <Text style={styles.assignButtonText}>
+                  {order.serviceAgentName ? 'Change' : 'Assign'}
+                </Text>
+              </TouchableOpacity>
+            }
+
           </View>
 
           {order.serviceAgentName ? (
@@ -490,7 +495,7 @@ export const OrderDetailsScreen = () => {
               )}
             </View>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.noAgentSection}
               onPress={() => agentActionSheetRef.current?.show()}
             >

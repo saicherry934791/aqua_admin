@@ -71,7 +71,7 @@ const OrdersScreen = () => {
         setOrders([]);
       }
     } catch (error) {
-      console.error('Failed to fetch orders:', error);
+      console.log('Failed to fetch orders:', error);
       // Set empty array on error
       setOrders([]);
     }

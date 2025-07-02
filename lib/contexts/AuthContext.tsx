@@ -1,10 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import {
-    getAuth,
+    FirebaseAuthTypes, getAuth,
     signInWithPhoneNumber,
     signOut
 } from '@react-native-firebase/auth';
+import { router } from 'expo-router';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { apiService } from '../api/api';
 
@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 await refreshUser();
             }
         } catch (error) {
-            console.error('Auth initialization error:', error);
+            console.log('Auth initialization error:', error);
             await clearAuthData();
         } finally {
             setIsLoading(false);
@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             return confirmation;
         } catch (error) {
             console.log('=== OTP Error ===');
-            console.error('Error details:', error);
+            console.log('Error details:', error);
             throw error;
         }
     };
@@ -189,7 +189,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 throw new Error(response.error || 'Login failed');
             }
         } catch (error: any) {
-            console.error('Verify OTP error:', error);
+            console.log('Verify OTP error:', error);
             
             // Clear confirmation on error so user can try again
             setConfirmation(null);
@@ -225,8 +225,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 originalUser: null,
                 currentViewRole: null,
             });
+            router.replace('/(auth)')
         } catch (error) {
-            console.error('Logout error:', error);
+            console.log('Logout error:', error);
         } finally {
             setIsLoading(false);
         }
@@ -378,7 +379,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 }
             }
         } catch (error: any) {
-            console.error('Refresh user error:', error);
+            console.log('Refresh user error:', error);
             // If token is invalid, clear auth data
             if (error?.response?.status === 401) {
                 await clearAuthData();

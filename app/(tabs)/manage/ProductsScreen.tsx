@@ -43,7 +43,7 @@ const ProductScreen = () => {
         // Clear the refresh data parameter
         router.setParams({ refreshData: undefined });
       } catch (error) {
-        console.error('Error parsing refresh data:', error);
+        console.log('Error parsing refresh data:', error);
       }
     }
   }, [refreshData]);
@@ -69,7 +69,7 @@ const ProductScreen = () => {
 
       setProducts(transformed);
     } catch (err) {
-      console.error('Error fetching products:', err);
+      console.log('Error fetching products:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -111,7 +111,7 @@ const ProductScreen = () => {
 
 
     } catch (error) {
-      console.error('Error updating product status:', error);
+      console.log('Error updating product status:', error);
       Alert.alert(
         'Error',
         'Failed to update product status',

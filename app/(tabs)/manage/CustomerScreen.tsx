@@ -79,7 +79,7 @@ const CustomerScreen = () => {
         setCustomers(data);
       }
     } catch (error) {
-      console.error('Failed to fetch customers:', error);
+      console.log('Failed to fetch customers:', error);
     }
     setLoading(false);
     setRefreshing(false);

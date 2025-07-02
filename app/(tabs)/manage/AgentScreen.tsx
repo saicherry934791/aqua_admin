@@ -1,11 +1,11 @@
 import { apiService } from '@/lib/api/api';
-import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
+import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 
 type FilterType = 'all' | 'active' | 'inactive' | 'recent';
 
@@ -36,7 +36,7 @@ const AgentScreen = () => {
                 // Clear the refresh data parameter
                 router.setParams({ refreshData: undefined });
             } catch (error) {
-                console.error('Error parsing refresh data:', error);
+                console.log('Error parsing refresh data:', error);
             }
         }
     }, [refreshData]);
@@ -66,7 +66,7 @@ const AgentScreen = () => {
                 setAgents([]);
             }
         } catch (err) {
-            console.error('Failed to fetch agents:', err);
+            console.log('Failed to fetch agents:', err);
             setAgents([]);
         } finally {
             setLoading(false);

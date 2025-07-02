@@ -1,15 +1,13 @@
-import { Button } from '@react-navigation/elements';
-import { router, useNavigation } from 'expo-router';
-import { LocationEdit as Edit3, TrendingUp, Users, Package, DollarSign, Wrench, MapPin, Calendar, Bell, Activity, ChartBar as BarChart3, ChartPie as PieChart } from 'lucide-react-native';
-import React, { useContext, useLayoutEffect, useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View, Dimensions, ActivityIndicator } from 'react-native';
-import { SheetManager } from 'react-native-actions-sheet';
-import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
-import { DistributionPieChart } from '@/lib/components/grphs/DistributionPieChart';
-import { ComparisonLineChart } from '@/lib/components/grphs/ComparisonLineChart';
-import { ComparisonBarChart } from '@/lib/components/grphs/ComparisonBarChart';
-import { BarChartData, LineChartData } from '@/lib/components/grphs/ChartTypes';
 import { apiService } from '@/lib/api/api';
+import { ComparisonBarChart } from '@/lib/components/grphs/ComparisonBarChart';
+import { ComparisonLineChart } from '@/lib/components/grphs/ComparisonLineChart';
+import { DistributionPieChart } from '@/lib/components/grphs/DistributionPieChart';
+import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
+import { router, useNavigation } from 'expo-router';
+import { Activity, ChartBar as BarChart3, Bell, Calendar, DollarSign, LocationEdit as Edit3, MapPin, Package, TrendingUp, Users, Wrench } from 'lucide-react-native';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SheetManager } from 'react-native-actions-sheet';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -123,6 +121,8 @@ export default function DashboardScreen() {
       });
 
       const result = await apiService.get(`/dashboard/stats?${params}`);
+
+      console.log('result here is ',result)
       
       if (result.success) {
         setDashboardData(result.data);
@@ -130,8 +130,9 @@ export default function DashboardScreen() {
         // Fallback to mock data if API fails
         setDashboardData(getMockDashboardData());
       }
+      setDashboardData(getMockDashboardData());
     } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      console.log('Failed to fetch dashboard data:', error);
       // Fallback to mock data
       setDashboardData(getMockDashboardData());
     } finally {
