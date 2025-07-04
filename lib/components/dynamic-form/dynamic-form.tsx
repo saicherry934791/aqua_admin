@@ -77,7 +77,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
 
   const updateValue = useCallback(
     (sectionId: string, fieldId: string, value: any) => {
-     console.log('value before is ',value)
+    //  console.log('value before is ',value)
       setValues((prev: any) => ({
         ...prev,
         [sectionId]: {
