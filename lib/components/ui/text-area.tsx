@@ -16,12 +16,13 @@ export const Textarea: React.FC<TextareaProps> = ({ label, error, rows = 4, styl
         multiline
         textAlignVertical="top"
         placeholderTextColor="#71717a"
-        scrollEnabled={true}
+        scrollEnabled={false}
         textContentType="none"
         autoComplete="off"
         spellCheck={false}
         autoCorrect={false}
-        blurOnSubmit={false}
+        blurOnSubmit={true}
+        returnKeyType="done"
         {...props}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}

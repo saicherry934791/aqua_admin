@@ -9,7 +9,8 @@ import {
   StyleSheet,
   Text,
   View,
-  Keyboard
+  Keyboard,
+  KeyboardAvoidingView
 } from "react-native"
 import { Button } from "../ui/button"
 import { ImagePickerComponent } from "../ui/image-picker"
@@ -204,18 +205,21 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
+        keyboardDismissMode="on-drag"
         scrollEventThrottle={16}
-        bounces={true}
-        alwaysBounceVertical={false}
-        removeClippedSubviews={false}
-        nestedScrollEnabled={true}
+        bounces={Platform.OS === 'ios'}
+        overScrollMode="never"
+        contentInsetAdjustmentBehavior="automatic"
       >
         {sections.map((section) => (
           <View key={section.id} style={styles.section}>
@@ -249,7 +253,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
           />
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   )
 }
 
@@ -263,7 +267,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100, // Extra padding at bottom for keyboard
+    paddingBottom: Platform.OS === 'ios' ? 50 : 100,
+    flexGrow: 1,
   },
   section: {
     marginBottom: 24,

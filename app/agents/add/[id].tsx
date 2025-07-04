@@ -107,17 +107,19 @@ const AgentFormScreen = () => {
 
             Alert.alert("Success", `Agent ${isNew ? "created" : "updated"} successfully`)
             
-            // Navigate back to manage screen with refresh data
-            router.push({
-                pathname: '/(tabs)/manage',
-                params: { 
-                    tab: 'Agents',
-                    refreshData: JSON.stringify({
-                        type: isNew ? 'add' : 'update',
-                        data: newAgentData
-                    })
-                }
-            });
+            // Use setTimeout to ensure navigation happens after state updates
+            setTimeout(() => {
+                router.push({
+                    pathname: '/(tabs)/manage',
+                    params: { 
+                        tab: 'Agents',
+                        refreshData: JSON.stringify({
+                            type: isNew ? 'add' : 'update',
+                            data: newAgentData
+                        })
+                    }
+                });
+            }, 100);
 
         } catch (error) {
             console.log("Submit Error:", error)

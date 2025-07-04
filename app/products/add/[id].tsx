@@ -119,17 +119,19 @@ const ProductFormScreen = () => {
 
             Alert.alert("Success", `Product ${isNew ? "created" : "updated"} successfully`)
             
-            // Navigate back to manage screen with refresh data
-            router.push({
-                pathname: '/(tabs)/manage',
-                params: { 
-                    tab: 'Products',
-                    refreshData: JSON.stringify({
-                        type: isNew ? 'add' : 'update',
-                        data: newProductData
-                    })
-                }
-            });
+            // Use setTimeout to ensure navigation happens after state updates
+            setTimeout(() => {
+                router.push({
+                    pathname: '/(tabs)/manage',
+                    params: { 
+                        tab: 'Products',
+                        refreshData: JSON.stringify({
+                            type: isNew ? 'add' : 'update',
+                            data: newProductData
+                        })
+                    }
+                });
+            }, 100);
 
         } catch (error) {
             console.log("Submit Error:", error)

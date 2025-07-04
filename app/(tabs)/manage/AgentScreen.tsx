@@ -84,7 +84,7 @@ const AgentScreen = () => {
                     franchise: item.franchiseName || 'Global Agent',
                     franchiseId: item.franchiseId,
                     createdAt: item.joined,
-                    joinDate: new Date(item.joined),
+                    joinDate: item.joined ? new Date(item.joined) : new Date(),
                     serviceRequestsCount: item.serviceRequestsCount,
                     ordersCount: item.ordersCount
                 }));
@@ -117,7 +117,7 @@ const AgentScreen = () => {
     const recentAgents = agents.filter(a => {
         const oneMonthAgo = new Date();
         oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-        return new Date(a.createdAt) > oneMonthAgo;
+        return a.createdAt && new Date(a.createdAt) > oneMonthAgo;
     }).length;
 
     // Filter agents based on active filter
@@ -130,7 +130,7 @@ const AgentScreen = () => {
             case 'recent':
                 const oneMonthAgo = new Date();
                 oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-                return new Date(agent.createdAt) > oneMonthAgo;
+                return agent.createdAt && new Date(agent.createdAt) > oneMonthAgo;
             default:
                 return true;
         }
@@ -368,10 +368,10 @@ const AgentScreen = () => {
                                     <View style={styles.metricBox}>
                                         <Text style={styles.metricLabel}>Joined</Text>
                                         <Text style={styles.metricValue}>
-                                            {item.joinDate.toLocaleDateString('en-US', {
+                                            {item.joinDate ? item.joinDate.toLocaleDateString('en-US', {
                                                 month: 'short',
                                                 year: 'numeric'
-                                            })}
+                                            }) : 'N/A'}
                                         </Text>
                                     </View>
                                 </View>

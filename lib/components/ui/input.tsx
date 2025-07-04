@@ -14,11 +14,12 @@ export const Input: React.FC<InputProps> = ({ label, error, variant = "default",
       <TextInput
         style={[styles.input, styles[variant], error && styles.error, style]}
         placeholderTextColor="#71717a"
-        scrollEnabled={false}
         textContentType="none"
         autoComplete="off"
         spellCheck={false}
         autoCorrect={false}
+        returnKeyType="done"
+        blurOnSubmit={true}
         {...props}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
