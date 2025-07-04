@@ -97,20 +97,17 @@ const FranchiseFormScreen = () => {
 
             Alert.alert("Success", `Franchise ${isNew ? "created" : "updated"} successfully`)
             
-            // Navigate back with the new/updated data
-            if (router.canGoBack()) {
-                router.back();
-                // Use a timeout to ensure navigation completes before sending data
-                setTimeout(() => {
-                    // This will trigger a refresh in the list screen
-                    router.setParams({ 
-                        refreshData: JSON.stringify({
-                            type: isNew ? 'add' : 'update',
-                            data: newFranchiseData
-                        })
-                    });
-                }, 100);
-            }
+            // Navigate back to manage screen with refresh data
+            router.push({
+                pathname: '/(tabs)/manage',
+                params: { 
+                    tab: 'Franchises',
+                    refreshData: JSON.stringify({
+                        type: isNew ? 'add' : 'update',
+                        data: newFranchiseData
+                    })
+                }
+            });
         } catch (error: any) {
             Alert.alert("Error", error.message || "Failed to submit the form")
         }
