@@ -120,18 +120,24 @@ const ProductFormScreen = () => {
             Alert.alert("Success", `Product ${isNew ? "created" : "updated"} successfully`)
             
             // Use setTimeout to ensure navigation happens after state updates
-            setTimeout(() => {
-                router.push({
-                    pathname: '/(tabs)/manage',
-                    params: { 
-                        tab: 'Products',
-                        refreshData: JSON.stringify({
-                            type: isNew ? 'add' : 'update',
-                            data: newProductData
-                        })
-                    }
-                });
-            }, 100);
+            setTimeout(async () => {
+                try {
+                    await router.push({
+                        pathname: '/(tabs)/manage',
+                        params: { 
+                            tab: 'Products',
+                            refreshData: JSON.stringify({
+                                type: isNew ? 'add' : 'update',
+                                data: newProductData
+                            })
+                        }
+                    });
+                } catch (navError) {
+                    console.log('Navigation error:', navError);
+                    // Fallback navigation
+                    router.replace('/(tabs)/manage');
+                }
+            }, 300);
 
         } catch (error) {
             console.log("Submit Error:", error)

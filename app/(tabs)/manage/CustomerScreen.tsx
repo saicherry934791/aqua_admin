@@ -104,7 +104,11 @@ const CustomerScreen = () => {
   const recentCustomers = customers.filter(c => {
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-    return c.createdAt && new Date(c.createdAt) > oneMonthAgo;
+    try {
+      return c.createdAt && new Date(c.createdAt) > oneMonthAgo;
+    } catch {
+      return false;
+    }
   }).length;
   const premiumCustomers = customers.filter(c => c.isPremium).length;
 
@@ -118,7 +122,11 @@ const CustomerScreen = () => {
       case 'recent':
         const oneMonthAgo = new Date();
         oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-        return customer.createdAt && new Date(customer.createdAt) > oneMonthAgo;
+        try {
+          return customer.createdAt && new Date(customer.createdAt) > oneMonthAgo;
+        } catch {
+          return false;
+        }
       case 'premium':
         return customer.isPremium;
       default:
@@ -274,10 +282,16 @@ const CustomerScreen = () => {
                   <View style={styles.metricBox}>
                     <Text style={styles.metricLabel}>Joined</Text>
                     <Text style={styles.metricValue}>
-                      {item.joinDate ? item.joinDate.toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        year: 'numeric' 
-                      }) : 'N/A'}
+                      {(() => {
+                        try {
+                          return item.joinDate ? item.joinDate.toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            year: 'numeric' 
+                          }) : 'N/A';
+                        } catch {
+                          return 'N/A';
+                        }
+                      })()}
                     </Text>
                   </View>
                 </View>

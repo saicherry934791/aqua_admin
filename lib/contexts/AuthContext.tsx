@@ -104,6 +104,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const initializeAuth = async () => {
         try {
+            setIsLoading(true);
             const [accessToken, userProfile, viewAsData] = await AsyncStorage.multiGet([
                 'accessToken',
                 'userProfile',
@@ -153,6 +154,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const verifyOTP = async (otp: string, role: string): Promise<boolean> => {
         try {
+            // Don't set loading here as it's handled by the OTP screen
             if (!confirmation) {
                 throw new Error('No OTP confirmation found. Please request a new OTP.');
             }
@@ -201,13 +203,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             } else {
                 throw new Error(error.message || 'OTP verification failed. Please try again.');
             }
+        } finally {
+            // Ensure loading state is cleared
+            setIsLoading(false);
         }
     };
 
     const logout = async () => {
         try {
-            setIsLoading(true);
-
             // Sign out from Firebase
             await signOut(getAuth());
 
@@ -225,8 +228,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             router.replace('/(auth)')
         } catch (error) {
             console.log('Logout error:', error);
-        } finally {
-            setIsLoading(false);
         }
     };
 

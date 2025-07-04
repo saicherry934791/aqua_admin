@@ -98,18 +98,24 @@ const FranchiseFormScreen = () => {
             Alert.alert("Success", `Franchise ${isNew ? "created" : "updated"} successfully`)
             
             // Use setTimeout to ensure navigation happens after state updates
-            setTimeout(() => {
-                router.push({
-                    pathname: '/(tabs)/manage',
-                    params: { 
-                        tab: 'Franchises',
-                        refreshData: JSON.stringify({
-                            type: isNew ? 'add' : 'update',
-                            data: newFranchiseData
-                        })
-                    }
-                });
-            }, 100);
+            setTimeout(async () => {
+                try {
+                    await router.push({
+                        pathname: '/(tabs)/manage',
+                        params: { 
+                            tab: 'Franchises',
+                            refreshData: JSON.stringify({
+                                type: isNew ? 'add' : 'update',
+                                data: newFranchiseData
+                            })
+                        }
+                    });
+                } catch (navError) {
+                    console.log('Navigation error:', navError);
+                    // Fallback navigation
+                    router.replace('/(tabs)/manage');
+                }
+            }, 300);
         } catch (error: any) {
             Alert.alert("Error", error.message || "Failed to submit the form")
         }

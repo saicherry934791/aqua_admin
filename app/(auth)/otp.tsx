@@ -3,7 +3,6 @@ import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
-    ActivityIndicator,
     Alert,
     StyleSheet,
     Text,
@@ -104,9 +103,15 @@ const OTPScreen = () => {
                 if (success) {
                     setVerificationSuccess(true);
                     // Small delay to show success state before navigation
-                    setTimeout(() => {
-                        router.replace('/(tabs)');
-                    }, 500);
+                    setTimeout(async () => {
+                        try {
+                            await router.replace('/(tabs)');
+                        } catch (navError) {
+                            console.log('Navigation error after OTP:', navError);
+                            // Force navigation as fallback
+                            router.push('/(tabs)');
+                        }
+                    }, 800);
                 } else {
                     Alert.alert('Invalid OTP', 'The OTP you entered is incorrect. Please try again.');
                     // Clear OTP on failure
