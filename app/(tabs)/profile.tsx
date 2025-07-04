@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import React, { useContext, useState } from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import React, { useContext, useLayoutEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/lib/contexts/AuthContext';
@@ -9,6 +9,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const {logout} = useAuth()
 
+  const navigation = useNavigation()
   // Sample user data (would typically come from authentication context/state management)
   const [userData] = useState({
     superAdmin: {
@@ -32,6 +33,24 @@ export default function ProfileScreen() {
       assignedFranchise: 'Franchise B',
     }
   });
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+        headerTitle: () => (
+            <Text
+                style={{
+                    fontSize: 20, // equivalent to text-2xl
+                    fontFamily: 'Outfit_700Bold', // equivalent to font-grotesk-bold
+                    color: '#121516',
+                }}
+            >
+                PROFILE
+            </Text>
+        ),
+        headerTitleAlign: 'center',
+        headerShadowVisible :false
+    });
+}, [navigation]);
 
   const handleLogout = async () => {
     // Reset user type to guest

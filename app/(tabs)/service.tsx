@@ -3,8 +3,8 @@ import { apiService } from '@/lib/api/api';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useNavigation } from 'expo-router';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'created' | 'assigned' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -39,6 +39,26 @@ const ServiceRequestsScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
     const [typeFilter, setTypeFilter] = useState<ServiceTypeFilter>('all');
+
+    const navigation = useNavigation();
+
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerTitle: () => (
+                <Text
+                    style={{
+                        fontSize: 20, // equivalent to text-2xl
+                        fontFamily: 'Outfit_700Bold', // equivalent to font-grotesk-bold
+                        color: '#121516',
+                    }}
+                >
+                    SERVICES
+                </Text>
+            ),
+            headerTitleAlign: 'center',
+            headerShadowVisible :false
+        });
+    }, [navigation]);
 
     const fetchServiceRequests = async () => {
         setLoading(true);

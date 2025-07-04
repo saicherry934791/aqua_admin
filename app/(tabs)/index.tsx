@@ -106,13 +106,13 @@ export default function DashboardScreen() {
   const [isDashboardLoading, setIsDashboardLoading] = useState(true);
 
   const { user } = useAuth();
-  
+
   const navigation = useNavigation();
 
   // Fetch dashboard data from API
   const fetchDashboardData = async () => {
     if (!user) return;
-    
+
     setIsDashboardLoading(true);
     try {
       const params = new URLSearchParams({
@@ -122,8 +122,8 @@ export default function DashboardScreen() {
 
       const result = await apiService.get(`/dashboard/stats?${params}`);
 
-      console.log('result here is ',result)
-      
+      console.log('result here is ', result)
+
       if (result.success) {
         setDashboardData(result.data);
       } else {
@@ -201,13 +201,23 @@ export default function DashboardScreen() {
     fetchDashboardData();
   }, [user, startDate, endDate]);
 
+  const openDateRangeSheet = () => {
+    SheetManager.show('date-range-sheet', {
+      payload: {
+        onDateRangeSelect: handleDateRangeSelect,
+      },
+    });
+  };
+
+
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerShadowVisible: false,
       headerTitle: () => (
         <View style={styles.headerContainer}>
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>
+            <Text
+              style={styles.headerTitle}
+            >
               {user?.role === UserRole.ADMIN ? 'ADMIN DASHBOARD' :
                 user?.role === UserRole.FRANCHISE_OWNER ? 'FRANCHISE DASHBOARD' :
                   'SERVICE DASHBOARD'}
@@ -225,21 +235,38 @@ export default function DashboardScreen() {
         </View>
       ),
       headerTitleAlign: 'left',
+      headerShadowVisible: false
+      // headerShadowVisible: false,
+      // headerTitle: () => (
+      //   <View style={styles.headerContainer}>
+      //     <View style={styles.headerTitleContainer}>
+      //       <Text style={styles.headerTitle}>
+      //         {user?.role === UserRole.ADMIN ? 'ADMIN DASHBOARD' :
+      //           user?.role === UserRole.FRANCHISE_OWNER ? 'FRANCHISE DASHBOARD' :
+      //             'SERVICE DASHBOARD'}
+      //       </Text>
+      //       {/* <TouchableOpacity
+      //         onPress={openDateRangeSheet}
+      //         style={styles.headerDateContainer}
+      //       >
+      //         <Text style={styles.headerDateText}>
+      //           {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
+      //         </Text>
+      //         <Edit3 size={16} color="#007bff" style={styles.headerDateIcon} />
+      //       </TouchableOpacity> */}
+      //     </View>
+      //   </View>
+      // ),
+      // headerTitleAlign: 'left',
     });
   }, [navigation, startDate, endDate, user?.role]);
+
 
   const handleDateRangeSelect = (newStartDate: Date, newEndDate: Date) => {
     setStartDate(newStartDate);
     setEndDate(newEndDate);
   };
 
-  const openDateRangeSheet = () => {
-    SheetManager.show('date-range-sheet', {
-      payload: {
-        onDateRangeSelect: handleDateRangeSelect,
-      },
-    });
-  };
 
   // Get tabs based on user role - Generalized structure
   const getTabs = () => {
@@ -293,7 +320,7 @@ export default function DashboardScreen() {
 
   const renderAdminContent = () => {
     const data = dashboardData || getMockDashboardData();
-    
+
     switch (activeTab) {
       case 'overview':
         return (
@@ -393,33 +420,33 @@ export default function DashboardScreen() {
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
-              <StatCard 
-                title="Total Income" 
-                value={`₹${(data.finance.totalIncome.value / 100000).toFixed(1)}L`} 
-                icon={DollarSign} 
+              <StatCard
+                title="Total Income"
+                value={`₹${(data.finance.totalIncome.value / 100000).toFixed(1)}L`}
+                icon={DollarSign}
                 trend={data.finance.totalIncome.trend}
-                color="#10B981" 
+                color="#10B981"
               />
-              <StatCard 
-                title="Expenses" 
-                value={`₹${(data.finance.expenses.value / 100000).toFixed(1)}L`} 
-                icon={DollarSign} 
+              <StatCard
+                title="Expenses"
+                value={`₹${(data.finance.expenses.value / 100000).toFixed(1)}L`}
+                icon={DollarSign}
                 trend={data.finance.expenses.trend}
-                color="#EF4444" 
+                color="#EF4444"
               />
-              <StatCard 
-                title="Net Profit" 
-                value={`₹${(data.finance.netProfit.value / 100000).toFixed(1)}L`} 
-                icon={TrendingUp} 
+              <StatCard
+                title="Net Profit"
+                value={`₹${(data.finance.netProfit.value / 100000).toFixed(1)}L`}
+                icon={TrendingUp}
                 trend={data.finance.netProfit.trend}
-                color="#007bff" 
+                color="#007bff"
               />
-              <StatCard 
-                title="Franchise Revenue" 
-                value={`₹${(data.finance.franchiseRevenue.value / 100000).toFixed(1)}L`} 
-                icon={MapPin} 
+              <StatCard
+                title="Franchise Revenue"
+                value={`₹${(data.finance.franchiseRevenue.value / 100000).toFixed(1)}L`}
+                icon={MapPin}
                 trend={data.finance.franchiseRevenue.trend}
-                color="#F59E0B" 
+                color="#F59E0B"
               />
             </View>
             <View style={styles.chartSpacing} />
@@ -438,7 +465,7 @@ export default function DashboardScreen() {
 
   const renderFranchiseContent = () => {
     const data = dashboardData || getMockDashboardData();
-    
+
     switch (activeTab) {
       case 'overview':
         return (
@@ -528,31 +555,31 @@ export default function DashboardScreen() {
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
-              <StatCard 
-                title="Total Orders" 
-                value="156" 
-                icon={Package} 
+              <StatCard
+                title="Total Orders"
+                value="156"
+                icon={Package}
               />
-              <StatCard 
-                title="Order Revenue" 
-                value={`₹${(data.finance.orderRevenue.value / 1000).toFixed(0)}K`} 
-                icon={DollarSign} 
+              <StatCard
+                title="Order Revenue"
+                value={`₹${(data.finance.orderRevenue.value / 1000).toFixed(0)}K`}
+                icon={DollarSign}
                 trend={data.finance.orderRevenue.trend}
-                color="#10B981" 
+                color="#10B981"
               />
-              <StatCard 
-                title="Service Revenue" 
-                value={`₹${(data.finance.serviceRevenue.value / 1000).toFixed(0)}K`} 
-                icon={Wrench} 
+              <StatCard
+                title="Service Revenue"
+                value={`₹${(data.finance.serviceRevenue.value / 1000).toFixed(0)}K`}
+                icon={Wrench}
                 trend={data.finance.serviceRevenue.trend}
-                color="#8B5CF6" 
+                color="#8B5CF6"
               />
-              <StatCard 
-                title="Monthly Growth" 
-                value={`+${data.finance.monthlyGrowth.value}%`} 
-                icon={TrendingUp} 
+              <StatCard
+                title="Monthly Growth"
+                value={`+${data.finance.monthlyGrowth.value}%`}
+                icon={TrendingUp}
                 trend={data.finance.monthlyGrowth.trend}
-                color="#F59E0B" 
+                color="#F59E0B"
               />
             </View>
             <ComparisonLineChart
@@ -576,7 +603,7 @@ export default function DashboardScreen() {
 
   const renderServiceAgentContent = () => {
     const data = dashboardData || getMockDashboardData();
-    
+
     switch (activeTab) {
       case 'overview':
         return (
@@ -658,7 +685,7 @@ export default function DashboardScreen() {
               <StatCard title="Overdue" value="2" icon={Bell} />
               <StatCard title="Completed" value="35" icon={TrendingUp} />
             </View>
-            
+
             <View style={styles.quickActionsSection}>
               <Text style={styles.sectionTitle}>Task Management</Text>
               <View style={styles.quickActionsGrid}>
@@ -736,7 +763,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    flex: 1,
+    // flex: 1,
   },
   headerTitle: {
     color: '#111618',

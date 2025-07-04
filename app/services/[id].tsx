@@ -1,8 +1,8 @@
 import { apiService } from '@/lib/api/api';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -59,6 +59,26 @@ const ServiceDetailScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [updating, setUpdating] = useState(false);
     const { user } = useAuth()
+
+    const navigation = useNavigation()
+
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerTitle: () => (
+                <Text
+                    style={{
+                        fontSize: 20, // equivalent to text-2xl
+                        fontFamily: 'Outfit_500Medium', // equivalent to font-grotesk-bold
+                        color: '#121516',
+                    }}
+                >
+                    SERVICES
+                </Text>
+            ),
+            headerTitleAlign: 'center',
+            headerShadowVisible: false
+        });
+    }, [navigation]);
 
     const fetchServiceRequest = async () => {
         setLoading(true);

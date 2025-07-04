@@ -20,7 +20,7 @@ const Manage = () => {
 
     function getDefaultTab() {
         if (!user) return 'Products';
-        
+
         switch (user.role) {
             case UserRole.ADMIN:
                 return 'Products';
@@ -49,12 +49,21 @@ const Manage = () => {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: () => (
-                <Text style={{}}>MANAGE</Text>
+                <Text
+                    style={{
+                        fontSize: 20, // equivalent to text-2xl
+                        fontFamily: 'Outfit_700Bold', // equivalent to font-grotesk-bold
+                        color: '#121516',
+                    }}
+                >
+                    MANAGE
+                </Text>
             ),
             headerTitleAlign: 'center',
-            headerShadowVisible: false,
+            headerShadowVisible :false
         });
     }, [navigation]);
+
 
     if (availableTabs.length === 0) {
         return (
@@ -94,10 +103,10 @@ const Manage = () => {
             }}
         >
             {availableTabs.map((tab) => (
-                <Tab.Screen 
+                <Tab.Screen
                     key={tab.name}
-                    name={tab.name} 
-                    component={tab.component} 
+                    name={tab.name}
+                    component={tab.component}
                 />
             ))}
         </Tab.Navigator>
