@@ -5,7 +5,8 @@ import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapp
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'active' | 'pending' | 'company' | 'franchised';
@@ -17,13 +18,16 @@ const FranchiseScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const { viewAsFranchiseOwner } = useAuth();
-  const { refreshData } = useLocalSearchParams();
+  const params = useLocalSearchParams();
 
-  // Handle refresh data from form submissions
+  // Track if we need to refresh data
+  const [shouldRefresh, setShouldRefresh] = useState(false);
+
+  // Handle refresh when returning from forms
   useEffect(() => {
-    if (refreshData) {
+    if (params.refreshData) {
       try {
-        const parsedData = JSON.parse(refreshData as string);
+        const parsedData = JSON.parse(params.refreshData as string);
         if (parsedData.type === 'add') {
           // Add new franchise to the list
           setFranchises(prev => [parsedData.data, ...prev]);
@@ -36,12 +40,36 @@ const FranchiseScreen = () => {
           );
         }
         // Clear the refresh data parameter
-        router.setParams({ refreshData: undefined });
+        setTimeout(() => {
+          router.setParams({ refreshData: undefined });
+        }, 100);
       } catch (error) {
         console.log('Error parsing refresh data:', error);
       }
     }
-  }, [refreshData]);
+  }, [params.refreshData]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh if we're returning from another screen
+      if (shouldRefresh) {
+        fetchFranchises();
+        setShouldRefresh(false);
+      }
+    }, [shouldRefresh])
+  );
+
+  // Set refresh flag when navigating away
+  const handleAddFranchise = () => {
+    setShouldRefresh(true);
+    router.push('/franchise/add/new');
+  };
+
+  const handleEditFranchise = (franchiseId: string) => {
+    setShouldRefresh(true);
+    router.push(`/franchise/add/${franchiseId}`);
+  };
 
   const fetchFranchises = async () => {
     try {
@@ -97,10 +125,6 @@ const FranchiseScreen = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchFranchises();
-  };
-
-  const handleAddFranchise = () => {
-    router.push('/franchise/add/new');
   };
 
   useEffect(() => {
@@ -170,7 +194,7 @@ const FranchiseScreen = () => {
         router.push(`/franchise/${franchise.id}`);
         break;
       case 1:
-        router.push(`/franchise/add/${franchise.id}`);
+        handleEditFranchise(franchise.id);
         break;
       case 2:
         handleViewAsFranchise(franchise);

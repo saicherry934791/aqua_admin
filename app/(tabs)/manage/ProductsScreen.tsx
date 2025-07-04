@@ -3,7 +3,8 @@ import ProductSkeleton from '@/lib/components/skeltons/ProductSkeleton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   ActionSheetIOS,
   Alert,
@@ -22,13 +23,16 @@ const ProductScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-  const { refreshData } = useLocalSearchParams();
+  const params = useLocalSearchParams();
 
-  // Handle refresh data from form submissions
+  // Track if we need to refresh data
+  const [shouldRefresh, setShouldRefresh] = useState(false);
+
+  // Handle refresh when returning from forms
   useEffect(() => {
-    if (refreshData) {
+    if (params.refreshData) {
       try {
-        const parsedData = JSON.parse(refreshData as string);
+        const parsedData = JSON.parse(params.refreshData as string);
         if (parsedData.type === 'add') {
           // Add new product to the list
           setProducts(prev => [parsedData.data, ...prev]);
@@ -41,12 +45,36 @@ const ProductScreen = () => {
           );
         }
         // Clear the refresh data parameter
-        router.setParams({ refreshData: undefined });
+        setTimeout(() => {
+          router.setParams({ refreshData: undefined });
+        }, 100);
       } catch (error) {
         console.log('Error parsing refresh data:', error);
       }
     }
-  }, [refreshData]);
+  }, [params.refreshData]);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh if we're returning from another screen
+      if (shouldRefresh) {
+        fetchProducts();
+        setShouldRefresh(false);
+      }
+    }, [shouldRefresh])
+  );
+
+  // Set refresh flag when navigating away
+  const handleAddProduct = () => {
+    setShouldRefresh(true);
+    router.push('/products/add/new');
+  };
+
+  const handleEditProduct = (productId: string) => {
+    setShouldRefresh(true);
+    router.push(`/products/add/${productId}`);
+  };
 
   const fetchProducts = async () => {
     try {
@@ -169,7 +197,7 @@ const ProductScreen = () => {
         router.push(`/product/${product.id}`);
         break;
       case 1:
-        router.push(`/products/add/${product.id}`);
+        handleEditProduct(product.id);
         break;
       case 2:
         updateProductStatus(product.id, !product.isActive);
@@ -180,10 +208,6 @@ const ProductScreen = () => {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchProducts();
-  };
-
-  const handleAddProduct = () => {
-    router.push('/products/add/new');
   };
 
   useEffect(() => {
