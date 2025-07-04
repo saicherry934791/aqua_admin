@@ -3,6 +3,7 @@ import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    ActivityIndicator,
     Alert,
     StyleSheet,
     Text,
@@ -26,9 +27,10 @@ const OTPScreen = () => {
 
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [isComplete, setIsComplete] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [verifying, setVerifying] = useState(false);
     const [resendLoading, setResendLoading] = useState(false);
     const [resendTimer, setResendTimer] = useState(30);
+    const [verificationSuccess, setVerificationSuccess] = useState(false);
     const inputRefs = useRef<(TextInput | null)[]>([]);
 
     useEffect(() => {
@@ -48,6 +50,8 @@ const OTPScreen = () => {
     }, [resendTimer]);
 
     const handleOtpChange = (value: string, index: number) => {
+        if (verifying || verificationSuccess) return; // Prevent input during verification
+        
         if (value.length > 1 && index === 0) {
             // Handle paste
             const pastedCode = value.replace(/[^0-9]/g, '').slice(0, 6);
@@ -75,6 +79,8 @@ const OTPScreen = () => {
     };
 
     const handleKeyPress = (key: string, index: number) => {
+        if (verifying || verificationSuccess) return; // Prevent input during verification
+        
         if (key === 'Backspace') {
             if (otp[index] === '' && index > 0) {
                 const newOtp = [...otp];
@@ -92,11 +98,15 @@ const OTPScreen = () => {
     const handleVerifyOTP = async () => {
         const otpString = otp.join('');
         if (isComplete) {
-            setLoading(true);
+            setVerifying(true);
             try {
                 const success = await verifyOTP(otpString, role as string);
                 if (success) {
-                    router.replace('/(tabs)');
+                    setVerificationSuccess(true);
+                    // Small delay to show success state before navigation
+                    setTimeout(() => {
+                        router.replace('/(tabs)');
+                    }, 500);
                 } else {
                     Alert.alert('Invalid OTP', 'The OTP you entered is incorrect. Please try again.');
                     // Clear OTP on failure
@@ -110,13 +120,15 @@ const OTPScreen = () => {
                 setOtp(['', '', '', '', '', '']);
                 inputRefs.current[0]?.focus();
             } finally {
-                setLoading(false);
+                if (!verificationSuccess) {
+                    setVerifying(false);
+                }
             }
         }
     };
 
     const handleResendOTP = async () => {
-        if (resendTimer > 0) return;
+        if (resendTimer > 0 || verifying || verificationSuccess) return;
         
         setResendLoading(true);
         try {
@@ -140,7 +152,7 @@ const OTPScreen = () => {
             style={[
                 styles.otpInput,
                 otp[index] ? styles.filledInput : styles.emptyInput,
-                loading && { opacity: 0.6 }
+                (verifying || verificationSuccess) && { opacity: 0.6 }
             ]}
             value={otp[index]}
             onChangeText={(value) => handleOtpChange(value, index)}
@@ -149,11 +161,26 @@ const OTPScreen = () => {
             maxLength={6}
             textAlign="center"
             selectTextOnFocus={true}
-            editable={!loading}
+            editable={!verifying && !verificationSuccess}
             blurOnSubmit={false}
         />
     );
 
+    // Show success screen
+    if (verificationSuccess) {
+        return (
+            <View style={styles.successContainer}>
+                <View style={styles.successContent}>
+                    <View style={styles.successIcon}>
+                        <Text style={styles.successIconText}>✓</Text>
+                    </View>
+                    <Text style={styles.successTitle}>Verification Successful!</Text>
+                    <Text style={styles.successSubtitle}>Redirecting to dashboard...</Text>
+                    <ActivityIndicator size="large" color="#10B981" style={styles.successLoader} />
+                </View>
+            </View>
+        );
+    }
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Enter the code</Text>
@@ -168,14 +195,17 @@ const OTPScreen = () => {
             <TouchableOpacity
                 style={[
                     styles.verifyButton,
-                    isComplete ? styles.activeButton : styles.inactiveButton,
-                    loading && { opacity: 0.6 }
+                    isComplete && !verifying ? styles.activeButton : styles.inactiveButton,
+                    verifying && { opacity: 0.8 }
                 ]}
                 onPress={handleVerifyOTP}
-                disabled={!isComplete || loading}
+                disabled={!isComplete || verifying || verificationSuccess}
             >
-                {loading ? (
-                    <ActivityIndicator color="#fff" />
+                {verifying ? (
+                    <View style={styles.verifyingContainer}>
+                        <ActivityIndicator color="#fff" size="small" />
+                        <Text style={styles.verifyingText}>Verifying...</Text>
+                    </View>
                 ) : (
                     <Text style={styles.buttonText}>Verify OTP</Text>
                 )}
@@ -187,9 +217,9 @@ const OTPScreen = () => {
                 onPress={handleResendOTP}
                 style={[
                     styles.resendContainer,
-                    (resendTimer > 0 || resendLoading) && { opacity: 0.6 }
+                    (resendTimer > 0 || resendLoading || verifying || verificationSuccess) && { opacity: 0.6 }
                 ]}
-                disabled={resendTimer > 0 || resendLoading || loading}
+                disabled={resendTimer > 0 || resendLoading || verifying || verificationSuccess}
             >
                 {resendLoading ? (
                     <ActivityIndicator size="small" color="#607e8a" />
@@ -208,6 +238,47 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: 'white',
         paddingHorizontal: 16,
+    },
+    successContainer: {
+        flex: 1,
+        backgroundColor: 'white',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 32,
+    },
+    successContent: {
+        alignItems: 'center',
+    },
+    successIcon: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#10B981',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    successIconText: {
+        fontSize: 40,
+        color: 'white',
+        fontFamily: 'Outfit_700Bold',
+    },
+    successTitle: {
+        fontSize: 24,
+        fontFamily: 'Outfit_700Bold',
+        color: '#111827',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    successSubtitle: {
+        fontSize: 16,
+        fontFamily: 'Outfit_500Medium',
+        color: '#6B7280',
+        marginBottom: 32,
+        textAlign: 'center',
+    },
+    successLoader: {
+        marginTop: 16,
     },
     title: {
         color: '#111618',
@@ -255,6 +326,16 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginVertical: 12,
+    },
+    verifyingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    verifyingText: {
+        color: '#fff',
+        fontSize: 16,
+        fontFamily: 'Outfit_600SemiBold',
     },
     activeButton: {
         backgroundColor: '#20b7f3',

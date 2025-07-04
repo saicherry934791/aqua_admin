@@ -153,7 +153,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const verifyOTP = async (otp: string, role: string): Promise<boolean> => {
         try {
-            setIsLoading(true);
             if (!confirmation) {
                 throw new Error('No OTP confirmation found. Please request a new OTP.');
             }
@@ -202,8 +201,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             } else {
                 throw new Error(error.message || 'OTP verification failed. Please try again.');
             }
-        } finally {
-            setIsLoading(false);
         }
     };
 

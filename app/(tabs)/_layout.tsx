@@ -9,9 +9,17 @@ import { useColorScheme } from '@/lib/hooks/useColorScheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const { isAuthenticated, isLoading, user, canAccessTab, viewAsState, exitViewAs } = useAuth();
+  const { isAuthenticated, isLoading, user, viewAsState, exitViewAs } = useAuth();
 
-  if (isLoading) return null;
+  // Show loading screen while auth is initializing
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   // If not logged in, redirect to login
   if (!isAuthenticated) {
@@ -131,6 +139,18 @@ function TabBarIcon({ name, color }: { name: keyof typeof MaterialIcons.glyphMap
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontFamily: 'Outfit_500Medium',
+    color: '#6B7280',
   },
   viewAsHeader: {
     backgroundColor: '#F8FAFC',
