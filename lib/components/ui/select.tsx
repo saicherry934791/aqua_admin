@@ -105,10 +105,11 @@ export const Select: React.FC<SelectProps> = ({
                 style={[
                     styles.select,
                     error && styles.error,
-                    hasValue && styles.hasValue
+                    hasValue && styles.hasValue,
                 ]}
                 onPress={handlePress}
                 activeOpacity={0.7}
+                delayPressIn={0}
             >
                 <Text style={[
                     styles.text,
@@ -169,6 +170,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         minHeight: 48,
         shadowColor: "#000",
+        overflow: 'hidden',
         shadowOffset: {
             width: 0,
             height: 1,
@@ -189,6 +191,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: "#1e293b",
         flex: 1,
+        includeFontPadding: false,
         fontFamily: 'Outfit_400Regular',
     },
     placeholder: {

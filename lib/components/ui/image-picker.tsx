@@ -105,10 +105,16 @@ export const ImagePickerComponent: React.FC<ImagePickerComponentProps> = ({
   return (
     <View style={styles.container}>
       {label && <Text style={styles.label}>{label}</Text>}
-      <TouchableOpacity style={[styles.picker, error && styles.error]} onPress={handlePress}>
+      <TouchableOpacity 
+        style={[styles.picker, error && styles.error]} 
+        onPress={handlePress}
+        activeOpacity={0.7}
+        delayPressIn={0}
+      >
         <Text style={styles.pickerText}>{getPickerText()}</Text>
       </TouchableOpacity>
-      <View style={styles.imageContainer}>
+      {value.length > 0 && (
+        <View style={styles.imageContainer}>
         {value.map((imageSource, index) => (
           <View key={index} style={styles.imageWrapper}>
             <Image 
@@ -126,6 +132,7 @@ export const ImagePickerComponent: React.FC<ImagePickerComponentProps> = ({
           </View>
         ))}
       </View>
+      )}
       {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   )
@@ -151,6 +158,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
     minHeight: 40,
+    justifyContent: 'center',
   },
   error: {
     borderColor: "#ef4444",
@@ -163,7 +171,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 8,
+    marginTop: 12,
     gap: 8,
   },
   imageWrapper: {

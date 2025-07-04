@@ -1,5 +1,5 @@
 import type React from "react"
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native"
+import { StyleSheet, Text, TextInput, View, type TextInputProps, Platform } from "react-native"
 
 interface TextareaProps extends TextInputProps {
   label?: string
@@ -16,6 +16,12 @@ export const Textarea: React.FC<TextareaProps> = ({ label, error, rows = 4, styl
         multiline
         textAlignVertical="top"
         placeholderTextColor="#71717a"
+        scrollEnabled={true}
+        textContentType="none"
+        autoComplete="off"
+        spellCheck={false}
+        autoCorrect={false}
+        blurOnSubmit={false}
         {...props}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -40,11 +46,9 @@ const styles = StyleSheet.create({
     borderColor: "#e2e8f0",
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    paddingVertical: Platform.OS === 'ios' ? 12 : 14,
     minHeight: 48,
+    textAlignVertical: 'top',
     shadowColor: "#000",
     shadowOffset: {
         width: 0,
@@ -53,6 +57,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    fontSize: 16,
+    color: "#000000",
+    fontFamily: 'Outfit_400Regular',
   },
   error: {
     borderColor: "#ef4444",

@@ -1,5 +1,5 @@
 import type React from "react"
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native"
+import { StyleSheet, Text, TextInput, View, type TextInputProps, Platform } from "react-native"
 
 interface InputProps extends TextInputProps {
   label?: string
@@ -14,6 +14,11 @@ export const Input: React.FC<InputProps> = ({ label, error, variant = "default",
       <TextInput
         style={[styles.input, styles[variant], error && styles.error, style]}
         placeholderTextColor="#71717a"
+        scrollEnabled={false}
+        textContentType="none"
+        autoComplete="off"
+        spellCheck={false}
+        autoCorrect={false}
         {...props}
       />
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -39,7 +44,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#000000",
     minHeight: 48,
+    maxHeight: 48,
     fontFamily: 'Outfit_400Regular',
+    ...(Platform.OS === 'ios' && {
+      paddingTop: 12,
+      paddingBottom: 12,
+    }),
   },
   default: {
     backgroundColor: "#f4f4f5",
