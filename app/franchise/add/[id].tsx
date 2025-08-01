@@ -57,6 +57,8 @@ const FranchiseFormScreen = () => {
 
             if (isNew) {
                 result = await apiService.post('/franchises', payload);
+
+                console.log('in adding new frnahise ',result)
                 if (!result.success) {
                     throw new Error('Unable to add Franchise')
                 }
@@ -93,6 +95,7 @@ const FranchiseFormScreen = () => {
                     geoPolygon: payload.geoPolygon,
                     isCompanyManaged: true,
                 };
+                console.log('in updating frnahise ',result)
             }
 
             Alert.alert("Success", `Franchise ${isNew ? "created" : "updated"} successfully`)

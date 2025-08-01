@@ -1,6 +1,5 @@
-import { View, Text } from 'react-native'
+import { View, Text ,Button} from 'react-native'
 import React, { useState } from 'react'
-import { Button } from '@react-navigation/elements'
 
 const product = () => {
 
@@ -8,7 +7,7 @@ const product = () => {
     return (
         <View>
             <Text>product</Text>
-            <Button >Click</Button>
+            <Button title='Click' />
             {
                 visible ? <Text>Clicked </Text> : <Text>Clicked Back</Text>
             }

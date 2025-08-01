@@ -9,6 +9,7 @@ import AgentsScreen from './AgentScreen'
 import CustomersScreen from './CustomerScreen'
 import FranchiseScreen from './FranchiseScreen'
 import ProductsScreen from './ProductsScreen'
+import CategoriesScree from './CategoriesScree'
 
 const Tab = createMaterialTopTabNavigator()
 
@@ -35,6 +36,7 @@ const Manage = () => {
         if (!user) return [];
 
         const allTabs = [
+            { name: 'Categories', component: CategoriesScree, roles: [UserRole.ADMIN] },
             { name: 'Products', component: ProductsScreen, roles: [UserRole.ADMIN] },
             { name: 'Franchises', component: FranchiseScreen, roles: [UserRole.ADMIN] },
             { name: 'Agents', component: AgentsScreen, roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER] },

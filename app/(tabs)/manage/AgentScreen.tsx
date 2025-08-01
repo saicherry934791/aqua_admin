@@ -66,6 +66,8 @@ const AgentScreen = () => {
 
     const handleEditAgent = (agentId: string) => {
         setShouldRefresh(true);
+
+        
         router.push(`/agents/add/${agentId}`);
     };
 
@@ -86,7 +88,7 @@ const AgentScreen = () => {
                     createdAt: item.joined || new Date().toISOString(),
                     joinDate: item.joined ? new Date(item.joined) : null,
                     serviceRequestsCount: item.serviceRequestsCount,
-                    ordersCount: item.ordersCount
+                    ordersCount: item.installationRequestsCount
                 }));
                 console.log('mapped ', mapped);
                 setAgents(mapped);
@@ -366,11 +368,11 @@ const AgentScreen = () => {
 
                                 <View style={styles.metricsRow}>
                                     <View style={styles.metricBox}>
-                                        <Text style={styles.metricLabel}>Requests</Text>
+                                        <Text style={styles.metricLabel}>Services</Text>
                                         <Text style={styles.metricValue}>{item.serviceRequestsCount}</Text>
                                     </View>
                                     <View style={styles.metricBox}>
-                                        <Text style={styles.metricLabel}>Orders</Text>
+                                        <Text style={styles.metricLabel}>Installations</Text>
                                         <Text style={styles.metricValue}>{item.ordersCount}</Text>
                                     </View>
                                     <View style={styles.metricBox}>

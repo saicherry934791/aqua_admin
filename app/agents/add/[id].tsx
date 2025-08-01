@@ -46,13 +46,13 @@ const AgentFormScreen = () => {
 
             if (response.success && response.data) {
                 const data = response.data[0]
-                console.log('response in getting agent ',data)
+                console.log('response in getting agent ', data)
                 setInitialValues({
                     agent_info: {
                         agentName: data.name || "",
                         phoneNumber: data.number || "",
                         email: data.email || "",
-                        address: data.address || "",
+
                         alternativePhone: data.alternativePhone || "",
                         franchiseAreaId: data.franchiseId?.toString() || "",
                     },
@@ -73,7 +73,7 @@ const AgentFormScreen = () => {
                 name: values.agent_info.agentName,
                 number: values.agent_info.phoneNumber,
                 email: values.agent_info.email || null,
-                address: values.agent_info.address || null,
+
                 alternativeNumber: values.agent_info.alternativePhone || null,
                 franchiseId: values.agent_info.franchiseAreaId || null,
             }
@@ -81,11 +81,11 @@ const AgentFormScreen = () => {
             const endpoint = isNew ? "/agents" : `/agents/${id}`
             const method = isNew ? "post" : "patch"
 
-            console.log('came here ')
+            console.log('came here  ',payload)
             const response = await apiService[method](endpoint, payload)
-            
-            console.log('here completed ')
-            if (!response.success) {
+
+            console.log('here completed agent request  ',response)
+            if (response.success===false) {
                 throw new Error(response.message || "Failed to save agent")
             }
 
@@ -106,13 +106,13 @@ const AgentFormScreen = () => {
             };
 
             Alert.alert("Success", `Agent ${isNew ? "created" : "updated"} successfully`)
-            
+
             // Use setTimeout to ensure navigation happens after state updates
             setTimeout(async () => {
                 try {
                     await router.push({
                         pathname: '/(tabs)/manage',
-                        params: { 
+                        params: {
                             tab: 'Agents',
                             refreshData: JSON.stringify({
                                 type: isNew ? 'add' : 'update',
@@ -187,19 +187,7 @@ const AgentFormScreen = () => {
                         },
                     },
                 },
-                {
-                    id: "address",
-                    type: "textarea",
-                    label: "Address (Optional)",
-                    placeholder: "Enter agent address",
-                    required: false,
-                    props: {
-                        rows: 3,
-                    },
-                    validation: {
-                        max: 500,
-                    },
-                },
+
                 {
                     id: "alternativePhone",
                     type: "text",
@@ -222,11 +210,11 @@ const AgentFormScreen = () => {
                 {
                     id: "franchiseAreaId",
                     type: "select",
-                    label: "Franchise Area (Optional)",
-                    placeholder: "Select franchise area or leave empty for global agent",
-                    required: false,
+                    label: "Franchise Area ",
+                    placeholder: "Select franchise area",
+                    required: true,
                     options: [
-                        { label: "Global Agent (No specific area)", value: "" },
+
                         ...franchiseOptions
                     ],
                 },

@@ -5,9 +5,18 @@ import { Alert, StatusBar, StyleSheet, Text } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
 
+interface Category {
+    id: string;
+    name: string;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
 const ProductFormScreen = () => {
 
     const { id } = useLocalSearchParams()
+    const [categories, setCategories] = useState<Category[]>([]);
 
     const isNew = id === "new"
     const [initialValues, setInitialValues] = useState({})
@@ -16,30 +25,46 @@ const ProductFormScreen = () => {
     useEffect(() => {
         if (!isNew) {
             fetchProductData()
+           
         }
+        fetchCategories()
     }, [id])
+
+    const fetchCategories = async () => {
+        try {
+            const result = await apiService.get('/categories');
+            console.log('Fetched categories in products :', JSON.stringify(result.data.categories, null, 2));
+            setCategories(result.data.categories);
+        } catch (e) {
+            setCategories([])
+            console.log('exception ', e)
+        }
+    }
 
     const fetchProductData = async () => {
         try {
             const response = await apiService.get(`/products/${id}`)
             const data = response.data.product;
 
-            console.log('data is ',data)
+            console.log('data product  is ', data)
 
             setInitialValues({
                 product_info: {
                     name: data.name,
                     description: data.description,
-                    images: data.images.map((image:string)=>{return {
-                        isNew:false,
-                        uri:image
-                    }}),
+                    images: data.images.map((image: string) => {
+                        return {
+                            isNew: false,
+                            uri: image
+                        }
+                    }),
                     rentPrice: data.rentPrice?.toString(),
                     buyPrice: data.buyPrice?.toString(),
                     deposit: data.deposit?.toString(),
-                    isRentable: data.isRentable ? 'true':'false',
-                    isPurchasable: data.isPurchasable ?'true':'false',
-                    isActive: data.isActive?'true':'false',
+                    isRentable: data.isRentable ? 'true' : 'false',
+                    isPurchasable: data.isPurchasable ? 'true' : 'false',
+                    isActive: data.isActive ? 'true' : 'false',
+                    categoryId:data.categoryId
                 },
             })
         } catch (error) {
@@ -53,7 +78,7 @@ const ProductFormScreen = () => {
         try {
             const formData = new FormData()
 
-            let existingImages=[]
+            let existingImages = []
 
             formData.append("name", values.product_info.name)
             formData.append("description", values.product_info.description)
@@ -63,6 +88,7 @@ const ProductFormScreen = () => {
             formData.append("isRentable", values.product_info.isRentable)
             formData.append("isPurchasable", values.product_info.isPurchasable)
             formData.append("isActive", values.product_info.isActive)
+            formData.append("categoryId", values.product_info.categoryId)
             for (const image of values.product_info.images) {
                 if (image.isNew && image.uri) {
                     const file = {
@@ -71,21 +97,21 @@ const ProductFormScreen = () => {
                         type: "image/jpeg", // or determine dynamically
                     };
                     formData.append("images", file);
-                }else{
+                } else {
                     existingImages.push(image.uri)
                 }
             }
 
-            console.log('formData ',formData)
-            console.log('id ',id)
+            console.log('formData ', formData)
+            console.log('id ', id)
 
             const endpoint = isNew
                 ? "/products"
                 : `/products/${id}`
 
-            let response ;
+            let response;
 
-            if(isNew){
+            if (isNew) {
                 response = await apiService.post(endpoint, formData, {
                     headers: {
                         "Content-Type": "multipart/form-data",
@@ -93,9 +119,9 @@ const ProductFormScreen = () => {
                 }
                 )
 
-            }else{
-                formData.append("existingImages",JSON.stringify(existingImages))
-                response = await apiService.put(endpoint,formData,{
+            } else {
+                formData.append("existingImages", JSON.stringify(existingImages))
+                response = await apiService.put(endpoint, formData, {
                     headers: {
                         "Content-Type": "multipart/form-data",
                     }
@@ -118,13 +144,13 @@ const ProductFormScreen = () => {
             };
 
             Alert.alert("Success", `Product ${isNew ? "created" : "updated"} successfully`)
-            
+
             // Use setTimeout to ensure navigation happens after state updates
             setTimeout(async () => {
                 try {
                     await router.push({
                         pathname: '/(tabs)/manage',
-                        params: { 
+                        params: {
                             tab: 'Products',
                             refreshData: JSON.stringify({
                                 type: isNew ? 'add' : 'update',
@@ -160,6 +186,20 @@ const ProductFormScreen = () => {
                         min: 2,
                         max: 100,
                     },
+                },
+                {
+                    id: "categoryId",
+                    type: "select",
+                    label: "Category",
+                    placeholder: "Select Category",
+                    required: true,
+
+                    options: categories.map(c => {
+                        return {
+                            label: c.name,
+                            value: c.id
+                        }
+                    }),
                 },
                 {
                     id: "description",
@@ -254,16 +294,6 @@ const ProductFormScreen = () => {
                         { label: "No", value: 'false' },
                     ],
                 },
-                {
-                    id: "isActive",
-                    type: "select",
-                    label: "Is Active?",
-                    required: true,
-                    options: [
-                        { label: "Active", value: 'true' },
-                        { label: "Inactive", value: 'false' },
-                    ],
-                },
             ],
         },
     ]
@@ -293,8 +323,8 @@ const ProductFormScreen = () => {
 
 export default ProductFormScreen
 
-const styles= StyleSheet.create({
-    container :{
-        flex:1
+const styles = StyleSheet.create({
+    container: {
+        flex: 1
     }
 })

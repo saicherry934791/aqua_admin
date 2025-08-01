@@ -76,6 +76,7 @@ const FranchiseScreen = () => {
       setLoading(true);
       const result = await apiService.get('/franchises');
 
+      console.log('feanhcises are ',result)
       if (result.success && Array.isArray(result.data)) {
         let revenueSum = 0;
 

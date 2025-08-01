@@ -1,4 +1,4 @@
-// screens/OrdersScreen.tsx
+// screens/InstallationRequestsScreen.tsx
 import { apiService } from '@/lib/api/api';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
@@ -7,74 +7,83 @@ import { router, useNavigation } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-type FilterType = 'all' | 'created' | 'payment_pending' | 'payment_completed' | 'assigned' | 'installation_pending' | 'installed' | 'completed' | 'cancelled';
-type OrderTypeFilter = 'all' | 'rent' | 'purchase';
+type FilterType = 'all' | 'SUBMITTED' | 'FRANCHISE_CONTACTED' | 'INSTALLATION_SCHEDULED' | 'INSTALLATION_IN_PROGRESS' | 'INSTALLATION_COMPLETED' | 'CANCELLED' | 'REJECTED';
+type OrderTypeFilter = 'all' | 'RENTAL' | 'PURCHASE';
 
-interface Order {
+interface InstallationRequest {
   id: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail?: string;
   productId: string;
-  productName: string;
-  productImage?: string;
-  type: 'rent' | 'purchase';
-  status: 'created' | 'payment_pending' | 'payment_completed' | 'assigned' | 'installation_pending' | 'installed' | 'cancelled' | 'completed';
-  totalAmount: number;
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' | 'partial';
-  serviceAgentId?: string;
-  serviceAgentName?: string;
-  installationDate?: string;
+  customerId: string;
+  orderType: 'RENTAL' | 'PURCHASE';
+  name: string;
+  phoneNumber: string;
+  franchiseId: string;
+  franchiseName: string;
+  status: 'SUBMITTED' | 'FRANCHISE_CONTACTED' | 'INSTALLATION_SCHEDULED' | 'INSTALLATION_IN_PROGRESS' | 'INSTALLATION_COMPLETED' | 'CANCELLED' | 'REJECTED';
+  installationAddress: string;
+  scheduledDate: string | null;
+  assignedTechnicianId: string | null;
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
+  product: {
+    id: string;
+    name: string;
+    rentPrice: number;
+    buyPrice: number;
+    deposit: number;
+  };
+  franchise: {
+    id: string;
+    name: string;
+    city: string;
+  };
+  customer: {
+    id: string;
+    name: string | null;
+    phone: string;
+  };
+  assignedTechnician: {
+    id: string;
+    name: string | null;
+  } | null;
 }
 
-const OrdersScreen = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
+const InstallationRequestsScreen = () => {
+  const [requests, setRequests] = useState<InstallationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [typeFilter, setTypeFilter] = useState<OrderTypeFilter>('all');
-  const navigation = useNavigation()
+  const navigation = useNavigation();
 
-  const fetchOrders = async () => {
+  const fetchRequests = async () => {
     setLoading(true);
     try {
-      const result = await apiService.get('/orders');
-      console.log('Orders API response:', JSON.stringify(result));
+      const params: any = {
+        page: 1,
+        limit: 100
+      };
 
-      if (result.success && result.data && Array.isArray(result.data.orders)) {
-        // Map the API response to our Order interface
-        const mappedOrders: Order[] = result.data.orders.map((item: any) => ({
-          id: item.id || item._id || Date.now().toString(),
-          customerId: item.customerId || item.customer_id || '',
-          customerName: item.customer?.name || item.customerName || item.customer_name || 'Unknown Customer',
-          customerPhone: item.customer?.phone || item.customerPhone || item.customer_phone || '',
-          customerEmail: item.customer?.email || item.customerEmail || item.customer_email,
-          productId: item.productId || item.product_id || '',
-          productName: item.product?.name || item.productName || item.product_name || 'Unknown Product',
-          productImage: item.product?.images?.[0] || item.productImage || item.product_image,
-          type: (item.type || item.order_type || 'purchase').toLowerCase() as 'rent' | 'purchase',
-          status: (item.status || 'created').toLowerCase() as Order['status'],
-          totalAmount: item.totalAmount || item.total_amount || 0,
-          paymentStatus: (item.paymentStatus || item.payment_status || 'pending').toLowerCase() as Order['paymentStatus'],
-          serviceAgentId: item.serviceAgentId || item.service_agent_id || item.serviceAgent?.id,
-          serviceAgentName: item.serviceAgent?.name || item.serviceAgentName || item.service_agent_name,
-          installationDate: item.installationDate || item.installation_date,
-          createdAt: item.createdAt || item.created_at || new Date().toISOString(),
-          updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
-        }));
+      if (activeFilter !== 'all') {
+        params.status = activeFilter;
+      }
 
-        setOrders(mappedOrders);
+      if (typeFilter !== 'all') {
+        params.orderType = typeFilter;
+      }
+
+      const result = await apiService.get('/installation-requests', { params });
+      console.log('Installation Requests API response:', JSON.stringify(result));
+
+      if (result.success && result.data && Array.isArray(result.data.installationRequests)) {
+        setRequests(result.data.installationRequests);
       } else {
-        // Fallback to empty array if API doesn't return data
-        setOrders([]);
+        setRequests([]);
       }
     } catch (error) {
-      console.log('Failed to fetch orders:', error);
-      // Set empty array on error
-      setOrders([]);
+      console.log('Failed to fetch installation requests:', error);
+      setRequests([]);
     }
     setLoading(false);
     setRefreshing(false);
@@ -82,93 +91,69 @@ const OrdersScreen = () => {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchOrders();
+    fetchRequests();
   };
 
-  const handleCreateOrder = () => {
-    router.push('/orders/create');
-  };
   useLayoutEffect(() => {
     navigation.setOptions({
-        headerTitle: () => (
-            <Text
-                style={{
-                    fontSize: 20, // equivalent to text-2xl
-                    fontFamily: 'Outfit_700Bold', // equivalent to font-grotesk-bold
-                    color: '#121516',
-                }}
-            >
-                ORDERS
-            </Text>
-        ),
-        headerTitleAlign: 'center',
-        headerShadowVisible :false
+      headerTitle: () => (
+        <Text
+          style={{
+            fontSize: 20,
+            fontFamily: 'Outfit_700Bold',
+            color: '#121516',
+          }}
+        >
+          INSTALLATION REQUESTS
+        </Text>
+      ),
+      headerTitleAlign: 'center',
+      headerShadowVisible: false
     });
-}, [navigation]);
+  }, [navigation]);
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    fetchRequests();
+  }, [activeFilter, typeFilter]);
 
   // Calculate statistics
-  const createdOrders = orders.filter(o => o.status === 'created').length;
-  const paymentPendingOrders = orders.filter(o => o.status === 'payment_pending').length;
-  const paymentCompletedOrders = orders.filter(o => o.status === 'payment_completed').length;
-  const assignedOrders = orders.filter(o => o.status === 'assigned').length;
-  const installationPendingOrders = orders.filter(o => o.status === 'installation_pending').length;
-  const installedOrders = orders.filter(o => o.status === 'installed').length;
-  const completedOrders = orders.filter(o => o.status === 'completed').length;
-  const cancelledOrders = orders.filter(o => o.status === 'cancelled').length;
-
-  // Filter orders based on active filters
-  const filteredOrders = orders.filter(order => {
-    const statusMatch = activeFilter === 'all' || order.status === activeFilter;
-    const typeMatch = typeFilter === 'all' || order.type === typeFilter;
-    return statusMatch && typeMatch;
-  });
+  const submittedRequests = requests.filter(r => r.status === 'SUBMITTED').length;
+  const franchiseContactedRequests = requests.filter(r => r.status === 'FRANCHISE_CONTACTED').length;
+  const scheduledRequests = requests.filter(r => r.status === 'INSTALLATION_SCHEDULED').length;
+  const inProgressRequests = requests.filter(r => r.status === 'INSTALLATION_IN_PROGRESS').length;
+  const completedRequests = requests.filter(r => r.status === 'INSTALLATION_COMPLETED').length;
+  const cancelledRequests = requests.filter(r => r.status === 'CANCELLED').length;
+  const rejectedRequests = requests.filter(r => r.status === 'REJECTED').length;
 
   // Status filter buttons
   const statusFilters = [
-    { key: 'all', icon: 'list', label: 'All', value: orders.length, color: '#3B82F6', bgColor: '#EEF2FF' },
-    { key: 'created', icon: 'add-circle', label: 'Created', value: createdOrders, color: '#6B7280', bgColor: '#F9FAFB' },
-    { key: 'payment_pending', icon: 'card', label: 'Payment Pending', value: paymentPendingOrders, color: '#F59E0B', bgColor: '#FFFBEB' },
-    { key: 'payment_completed', icon: 'checkmark-circle', label: 'Payment Done', value: paymentCompletedOrders, color: '#10B981', bgColor: '#ECFDF5' },
-    { key: 'assigned', icon: 'person-add', label: 'Assigned', value: assignedOrders, color: '#8B5CF6', bgColor: '#F3E8FF' },
-    { key: 'installation_pending', icon: 'time', label: 'Installation Pending', value: installationPendingOrders, color: '#F59E0B', bgColor: '#FFFBEB' },
-    { key: 'installed', icon: 'checkmark-done', label: 'Installed', value: installedOrders, color: '#059669', bgColor: '#D1FAE5' },
-    { key: 'completed', icon: 'checkmark-done-circle', label: 'Completed', value: completedOrders, color: '#059669', bgColor: '#D1FAE5' },
-    { key: 'cancelled', icon: 'close-circle', label: 'Cancelled', value: cancelledOrders, color: '#EF4444', bgColor: '#FEF2F2' },
+    { key: 'all', icon: 'list', label: 'All', value: requests.length, color: '#3B82F6', bgColor: '#EEF2FF' },
+    { key: 'SUBMITTED', icon: 'add-circle', label: 'Submitted', value: submittedRequests, color: '#6B7280', bgColor: '#F9FAFB' },
+    { key: 'FRANCHISE_CONTACTED', icon: 'call', label: 'Contacted', value: franchiseContactedRequests, color: '#8B5CF6', bgColor: '#F3E8FF' },
+    { key: 'INSTALLATION_SCHEDULED', icon: 'calendar', label: 'Scheduled', value: scheduledRequests, color: '#F59E0B', bgColor: '#FFFBEB' },
+    { key: 'INSTALLATION_IN_PROGRESS', icon: 'construct', label: 'In Progress', value: inProgressRequests, color: '#10B981', bgColor: '#ECFDF5' },
+    { key: 'INSTALLATION_COMPLETED', icon: 'checkmark-done', label: 'Completed', value: completedRequests, color: '#059669', bgColor: '#D1FAE5' },
+    { key: 'CANCELLED', icon: 'close-circle', label: 'Cancelled', value: cancelledRequests, color: '#EF4444', bgColor: '#FEF2F2' },
+    { key: 'REJECTED', icon: 'close', label: 'Rejected', value: rejectedRequests, color: '#DC2626', bgColor: '#FEF2F2' },
   ];
 
   // Type filter buttons
   const typeFilters = [
     { key: 'all', label: 'All Types', color: '#3B82F6' },
-    { key: 'rent', label: 'Rental', color: '#10B981' },
-    { key: 'purchase', label: 'Purchase', color: '#F59E0B' },
+    { key: 'RENTAL', label: 'Rental', color: '#10B981' },
+    { key: 'PURCHASE', label: 'Purchase', color: '#F59E0B' },
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'created': return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
-      case 'payment_pending': return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
-      case 'payment_completed': return { bg: '#ECFDF5', text: '#047857', dot: '#10B981' };
-      case 'assigned': return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6' };
-      case 'installation_pending': return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
-      case 'installed': return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
-      case 'completed': return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
-      case 'cancelled': return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444' };
+      case 'SUBMITTED': return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
+      case 'FRANCHISE_CONTACTED': return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6' };
+      case 'INSTALLATION_SCHEDULED': return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
+      case 'INSTALLATION_IN_PROGRESS': return { bg: '#ECFDF5', text: '#047857', dot: '#10B981' };
+      case 'INSTALLATION_COMPLETED': return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
+      case 'CANCELLED': return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444' };
+      case 'REJECTED': return { bg: '#FEF2F2', text: '#DC2626', dot: '#DC2626' };
       default: return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
-    }
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    switch (status) {
-      case 'paid': return { bg: '#ECFDF5', text: '#047857' };
-      case 'pending': return { bg: '#FFFBEB', text: '#92400E' };
-      case 'failed': return { bg: '#FEF2F2', text: '#DC2626' };
-      case 'refunded': return { bg: '#F3E8FF', text: '#6B21A8' };
-      case 'partial': return { bg: '#FEF3C7', text: '#92400E' };
-      default: return { bg: '#F9FAFB', text: '#6B7280' };
     }
   };
 
@@ -185,7 +170,20 @@ const OrdersScreen = () => {
   };
 
   const getStatusDisplayText = (status: string) => {
-    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    switch (status) {
+      case 'SUBMITTED': return 'Submitted';
+      case 'FRANCHISE_CONTACTED': return 'Franchise Contacted';
+      case 'INSTALLATION_SCHEDULED': return 'Scheduled';
+      case 'INSTALLATION_IN_PROGRESS': return 'In Progress';
+      case 'INSTALLATION_COMPLETED': return 'Completed';
+      case 'CANCELLED': return 'Cancelled';
+      case 'REJECTED': return 'Rejected';
+      default: return status;
+    }
+  };
+
+  const getPriceForOrderType = (request: InstallationRequest) => {
+    return request.orderType === 'RENTAL' ? request.product.rentPrice : request.product.buyPrice;
   };
 
   return (
@@ -256,73 +254,76 @@ const OrdersScreen = () => {
           ))}
         </ScrollView>
 
-        {filteredOrders.length === 0 ? (
+        {requests.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialIcons name="receipt" size={48} color="#9CA3AF" />
+            <MaterialIcons name="build" size={48} color="#9CA3AF" />
             <Text style={styles.emptyTitle}>
-              {activeFilter === 'all' && typeFilter === 'all' ? 'No Orders Found' : 'No matching orders'}
+              {activeFilter === 'all' && typeFilter === 'all' ? 'No Installation Requests Found' : 'No matching requests'}
             </Text>
             <Text style={styles.emptySubtitle}>
               {activeFilter === 'all' && typeFilter === 'all'
-                ? 'Create your first order to get started'
+                ? 'Installation requests will appear here'
                 : 'Try adjusting your filters'
               }
             </Text>
           </View>
         ) : (
-          filteredOrders.map((order) => {
-            const statusColors = getStatusColor(order.status);
-            const paymentColors = getPaymentStatusColor(order.paymentStatus);
+          requests.map((request) => {
+            const statusColors = getStatusColor(request.status);
 
             return (
               <TouchableOpacity
-                key={order.id}
-                style={styles.orderCard}
+                key={request.id}
+                style={styles.requestCard}
                 onPress={() => {
-                  console.log('clicked ')
-                  router.push(`/orders/${order.id}`)
+                  console.log('clicked request:', request.id);
+                  router.push(`/orders/${request.id}`);
                 }}
                 activeOpacity={0.7}
               >
-                {/* Order Header */}
-                <View style={styles.orderHeader}>
-                  <View style={styles.orderInfo}>
-                    <View style={styles.orderTitleRow}>
-                      <Text style={styles.orderId}>#{order.id.slice(-6).toUpperCase()}</Text>
+                {/* Request Header */}
+                <View style={styles.requestHeader}>
+                  <View style={styles.requestInfo}>
+                    <View style={styles.requestTitleRow}>
+                      <Text style={styles.requestId}>#{request.id.slice(-6).toUpperCase()}</Text>
                       <View style={[styles.orderTypeBadge, {
-                        backgroundColor: order.type === 'rent' ? '#ECFDF5' : '#FFFBEB'
+                        backgroundColor: request.orderType === 'RENTAL' ? '#ECFDF5' : '#FFFBEB'
                       }]}>
                         <Text style={[styles.orderTypeText, {
-                          color: order.type === 'rent' ? '#047857' : '#92400E'
+                          color: request.orderType === 'RENTAL' ? '#047857' : '#92400E'
                         }]}>
-                          {order.type === 'rent' ? 'Rental' : 'Purchase'}
+                          {request.orderType}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.productName} numberOfLines={1}>{order.productName}</Text>
+                    <Text style={styles.productName} numberOfLines={1}>{request.product.name}</Text>
                     <Text style={styles.customerInfo} numberOfLines={1}>
                       <Ionicons name="person" size={12} color="#6B7280" />
-                      {' '}{order.customerName}
+                      {' '}{request.customer.name || request.name}
+                    </Text>
+                    <Text style={styles.franchiseInfo} numberOfLines={1}>
+                      <Ionicons name="business" size={12} color="#6B7280" />
+                      {' '}{request.franchise.name} - {request.franchise.city}
                     </Text>
                   </View>
-                  <View style={styles.orderAmount}>
-                    <Text style={styles.amountText}>{formatCurrency(order.totalAmount)}</Text>
-                    <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+                  <View style={styles.requestAmount}>
+                    <Text style={styles.amountText}>{formatCurrency(getPriceForOrderType(request))}</Text>
+                    <Text style={styles.requestDate}>{formatDate(request.createdAt)}</Text>
+                    {request.product.deposit > 0 && (
+                      <Text style={styles.depositText}>
+                        Deposit: {formatCurrency(request.product.deposit)}
+                      </Text>
+                    )}
                   </View>
                 </View>
 
-                {/* Order Status and Payment */}
+                {/* Request Status */}
                 <View style={styles.statusContainer}>
                   <View style={styles.statusRow}>
                     <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
                       <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
                       <Text style={[styles.statusText, { color: statusColors.text }]}>
-                        {getStatusDisplayText(order.status)}
-                      </Text>
-                    </View>
-                    <View style={[styles.paymentBadge, { backgroundColor: paymentColors.bg }]}>
-                      <Text style={[styles.paymentText, { color: paymentColors.text }]}>
-                        {order.paymentStatus.toUpperCase()}
+                        {getStatusDisplayText(request.status)}
                       </Text>
                     </View>
                   </View>
@@ -330,17 +331,36 @@ const OrdersScreen = () => {
 
                 {/* Additional Info */}
                 <View style={styles.additionalInfo}>
-                  {order.serviceAgentName && (
-                    <View style={styles.agentInfo}>
+                  <View style={styles.addressInfo}>
+                    <Ionicons name="location" size={14} color="#6B7280" />
+                    <Text style={styles.addressText} numberOfLines={1}>
+                      {request.installationAddress}
+                    </Text>
+                  </View>
+                  
+                  {request.assignedTechnician && (
+                    <View style={styles.technicianInfo}>
                       <Ionicons name="person-circle" size={14} color="#6B7280" />
-                      <Text style={styles.agentText}>Agent: {order.serviceAgentName}</Text>
+                      <Text style={styles.technicianText}>
+                        Technician: {request.assignedTechnician.name}
+                      </Text>
                     </View>
                   )}
-                  {order.installationDate && (
-                    <View style={styles.installationInfo}>
+                  
+                  {request.scheduledDate && (
+                    <View style={styles.scheduledInfo}>
                       <Ionicons name="calendar" size={14} color="#6B7280" />
-                      <Text style={styles.installationText}>
-                        Installation: {formatDate(order.installationDate)}
+                      <Text style={styles.scheduledText}>
+                        Scheduled: {formatDate(request.scheduledDate)}
+                      </Text>
+                    </View>
+                  )}
+
+                  {request.rejectionReason && (
+                    <View style={styles.rejectionInfo}>
+                      <Ionicons name="warning" size={14} color="#EF4444" />
+                      <Text style={styles.rejectionText} numberOfLines={2}>
+                        Rejected: {request.rejectionReason}
                       </Text>
                     </View>
                   )}
@@ -359,7 +379,7 @@ const OrdersScreen = () => {
   );
 };
 
-export default OrdersScreen;
+export default InstallationRequestsScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -451,7 +471,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_400Regular',
     color: '#9CA3AF',
   },
-  orderCard: {
+  requestCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
@@ -464,22 +484,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
-  orderHeader: {
+  requestHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 16,
   },
-  orderInfo: {
+  requestInfo: {
     flex: 1,
     marginRight: 12,
   },
-  orderTitleRow: {
+  requestTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
   },
-  orderId: {
+  requestId: {
     fontSize: 16,
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
@@ -504,8 +524,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'Outfit_400Regular',
     color: '#6B7280',
+    marginBottom: 2,
   },
-  orderAmount: {
+  franchiseInfo: {
+    fontSize: 13,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+  },
+  requestAmount: {
     alignItems: 'flex-end',
   },
   amountText: {
@@ -514,18 +540,23 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 2,
   },
-  orderDate: {
+  requestDate: {
     fontSize: 12,
     fontFamily: 'Outfit_400Regular',
     color: '#6B7280',
+    marginBottom: 2,
+  },
+  depositText: {
+    fontSize: 10,
+    fontFamily: 'Outfit_400Regular',
+    color: '#F59E0B',
   },
   statusContainer: {
     marginBottom: 16,
   },
   statusRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -543,17 +574,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontFamily: 'Outfit_500Medium',
-    textTransform: 'capitalize',
-  },
-  paymentBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
-  paymentText: {
-    fontSize: 10,
-    fontFamily: 'Outfit_500Medium',
-    textTransform: 'capitalize',
   },
   additionalInfo: {
     borderTopWidth: 1,
@@ -561,45 +581,51 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     gap: 8,
   },
-  agentInfo: {
+  addressInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  agentText: {
+  addressText: {
+    fontSize: 13,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+    marginLeft: 6,
+    flex: 1,
+  },
+  technicianInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  technicianText: {
     fontSize: 13,
     fontFamily: 'Outfit_400Regular',
     color: '#6B7280',
     marginLeft: 6,
   },
-  installationInfo: {
+  scheduledInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  installationText: {
+  scheduledText: {
     fontSize: 13,
     fontFamily: 'Outfit_400Regular',
     color: '#6B7280',
     marginLeft: 6,
+  },
+  rejectionInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  rejectionText: {
+    fontSize: 13,
+    fontFamily: 'Outfit_400Regular',
+    color: '#EF4444',
+    marginLeft: 6,
+    flex: 1,
   },
   actionIndicator: {
     position: 'absolute',
     top: 20,
     right: 20,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#3B82F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#3B82F6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });

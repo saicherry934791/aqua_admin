@@ -5,61 +5,82 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   Image,
   Linking,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import ActionSheet, { ActionSheetRef } from 'react-native-actions-sheet';
 
-// Backend enums - use exact values from backend
-export enum OrderStatus {
-  CREATED = 'created',
-  PAYMENT_PENDING = 'payment_pending',
-  PAYMENT_COMPLETED = 'payment_completed',
-  ASSIGNED = 'assigned',
-  INSTALLATION_PENDING = 'installation_pending',
-  INSTALLED = 'installed',
-  CANCELLED = 'cancelled',
-  COMPLETED = 'completed',
+// Installation Request Status enum - matches backend
+export enum InstallationStatus {
+  SUBMITTED = 'SUBMITTED',
+  FRANCHISE_CONTACTED = 'FRANCHISE_CONTACTED',
+  INSTALLATION_SCHEDULED = 'INSTALLATION_SCHEDULED',
+  INSTALLATION_IN_PROGRESS = 'INSTALLATION_IN_PROGRESS',
+  INSTALLATION_COMPLETED = 'INSTALLATION_COMPLETED',
+  CANCELLED = 'CANCELLED',
+  REJECTED = 'REJECTED',
 }
 
-export enum PaymentStatus {
-  PENDING = 'pending',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  REFUNDED = 'refunded',
-}
-
-interface Order {
+interface ActionHistory {
   id: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  customerEmail?: string;
-  customerAddress?: string;
+  actionType: string;
+  comment: string | null;
+  createdAt: string;
+  fromStatus: string | null;
+  toStatus: string;
+  performedBy: string;
+  performedByRole: string;
+  metadata: string | null;
+}
+
+interface InstallationRequest {
+  id: string;
   productId: string;
-  productName: string;
-  productImage?: string;
-  productDescription?: string;
-  type: 'RENT' | 'BUY';
-  status: OrderStatus;
-  totalAmount: number;
-  paidAmount?: number;
-  pendingAmount?: number;
-  paymentStatus: PaymentStatus;
-  serviceAgentId?: string;
-  serviceAgentName?: string;
-  serviceAgentPhone?: string;
-  installationDate?: string;
-  deliveryDate?: string;
-  notes?: string;
+  customerId: string;
+  orderType: 'RENTAL' | 'PURCHASE';
+  name: string;
+  phoneNumber: string;
+  franchiseId: string;
+  franchiseName: string;
+  status: InstallationStatus;
+  installationAddress: string;
+  scheduledDate: string | null;
+  assignedTechnicianId: string | null;
+  rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
+  product: {
+    id: string;
+    name: string;
+    rentPrice: number;
+    buyPrice: number;
+    deposit: number;
+  };
+  franchise: {
+    id: string;
+    name: string;
+    city: string;
+  };
+  customer: {
+    id: string;
+    name: string | null;
+    phone: string;
+  };
+  assignedTechnician: {
+    id: string;
+    name: string | null;
+  } | null;
+  actionHistory: ActionHistory[];
 }
 
 interface ServiceAgent {
@@ -67,131 +88,148 @@ interface ServiceAgent {
   name: string;
   phone: string;
   email?: string;
+  role: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  assignedDate: string;
 }
 
-export const OrderDetailsScreen = () => {
+export const InstallationRequestDetailsScreen = () => {
   const { id } = useLocalSearchParams();
-  const [order, setOrder] = useState<Order | null>(null);
+  const [request, setRequest] = useState<InstallationRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [serviceAgents, setServiceAgents] = useState<ServiceAgent[]>([]);
-  const { user } = useAuth()
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [comment, setComment] = useState('');
+  const [scheduledDate, setScheduledDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const { user } = useAuth();
 
   const statusActionSheetRef = useRef<ActionSheetRef>(null);
   const agentActionSheetRef = useRef<ActionSheetRef>(null);
-  const paymentActionSheetRef = useRef<ActionSheetRef>(null);
-  const moreActionsSheetRef = useRef<ActionSheetRef>(null);
+  const rejectActionSheetRef = useRef<ActionSheetRef>(null);
+  const cancelActionSheetRef = useRef<ActionSheetRef>(null);
+  const serviceRequestActionSheetRef = useRef<ActionSheetRef>(null);
 
-  const fetchOrderDetails = async () => {
+  const fetchRequestDetails = async () => {
     setLoading(true);
     try {
-      const result = await apiService.get(`/orders/${id}`);
-      const data = result?.data;
-
-      console.log('orders data ', JSON.stringify(data));
-
-      if (!data) {
-        setOrder(null);
+      const result = await apiService.get(`/installation-requests/${id}`);
+      
+      if (result.success && result.data) {
+        setRequest(result.data.installationRequest);
       } else {
-        const order = data.order as any;
-
-        const realOrder: Order = {
-          id: order.id,
-          customerId: order.customerId,
-          customerName: order.customer?.name || 'Unknown',
-          customerPhone: order.customer?.phone || 'N/A',
-          customerEmail: order.customer?.email || 'N/A',
-          customerAddress: order.customer?.address || 'N/A',
-          productId: order.productId,
-          productName: order.product?.name || 'Unknown Product',
-          productDescription: order.product?.description || '',
-          productImage: order.product?.images?.[0] || 'https://via.placeholder.com/300x200?text=No+Image',
-          type: order?.type?.toUpperCase(),
-          status: order?.status, // Keep backend status as-is
-          totalAmount: order.totalAmount,
-          paidAmount: order.payments?.reduce((sum, p) => sum + p.amount, 0) || 0,
-          pendingAmount: order.totalAmount - (order.payments?.reduce((sum, p) => sum + p.amount, 0) || 0),
-          paymentStatus: order.paymentStatus, // Keep backend payment status as-is
-          serviceAgentId: order.serviceAgentId,
-          serviceAgentName: order.serviceAgent?.name || null,
-          serviceAgentPhone: order.serviceAgent?.phone || null,
-          installationDate: order.installationDate,
-          deliveryDate: order.deliveryDate,
-          notes: order.notes || '',
-          createdAt: order.createdAt,
-          updatedAt: order.updatedAt,
-        };
-
-        setOrder(realOrder);
+        setRequest(null);
       }
-
     } catch (error) {
-      console.log('Failed to fetch order details:', error);
-      Alert.alert('Error', 'Failed to load order details');
+      Alert.alert('Error', 'Failed to load request details');
     }
     setLoading(false);
   };
 
   const fetchServiceAgents = async () => {
+    if (!request?.franchiseId) return;
+
     try {
-      const result = await apiService.get(`orders/${id}/available-agents`);
-      console.log('avilable service agents ', result.data.availableAgents)
-      const data = result?.data || [];
+      console.log('Fetching service agents for franchise:', request.franchiseId);
+      const result = await apiService.get(`/agents/franchise/${request.franchiseId}/agents`);
+      console.log('Available service agents:', result);
 
-
-      setServiceAgents(data.availableAgents);
-
+      if (result && Array.isArray(result.data)) {
+        setServiceAgents(result.data);
+      }
     } catch (error) {
       console.log('Failed to fetch service agents:', error);
     }
   };
 
   useEffect(() => {
-    fetchOrderDetails();
-    fetchServiceAgents();
+    fetchRequestDetails();
   }, [id]);
 
-  const handleStatusUpdate = async (newStatus: OrderStatus) => {
+  useEffect(() => {
+    if (request?.franchiseId) {
+      fetchServiceAgents();
+    }
+  }, [request?.franchiseId]);
+
+  const handleStatusUpdate = async (newStatus: InstallationStatus, additionalData?: any) => {
     try {
-      const result = await apiService.patch(`/orders/${id}/status`, { status: newStatus });
+      const payload: any = {
+        status: newStatus,
+        ...(comment && { comment }),
+        ...additionalData
+      };
 
-      // Refetch order details to get updated data
-      await fetchOrderDetails();
+      const result = await apiService.patch(`/installation-requests/${id}/status`, payload);
 
+      await fetchRequestDetails();
       statusActionSheetRef.current?.hide();
-      Alert.alert('Success', `Order status updated to ${getStatusDisplayName(newStatus)}`);
+      Alert.alert('Success', `Request status updated to ${getStatusDisplayName(newStatus)}`);
     } catch (error) {
-      console.log('Failed to update order status:', error);
-      Alert.alert('Error', 'Failed to update order status');
+      console.log('Failed to update request status:', error);
+      Alert.alert('Error', 'Failed to update request status');
     }
   };
 
-  const handleAgentAssignment = async (agentId: string, agentName: string, agentPhone: string) => {
+  const handleRejectRequest = async () => {
+    if (!rejectionReason.trim()) {
+      Alert.alert('Error', 'Please provide a rejection reason');
+      return;
+    }
+
     try {
-      const result = await apiService.post(`/orders/${id}/assign-agent`, { serviceAgentId: agentId });
+      await handleStatusUpdate(InstallationStatus.REJECTED, { rejectionReason });
+      rejectActionSheetRef.current?.hide();
+      setRejectionReason('');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to reject request');
+    }
+  };
 
-      // Refetch order details to get updated data
-      await fetchOrderDetails();
+  const handleCancelRequest = async () => {
+    if (!cancellationReason.trim()) {
+      Alert.alert('Error', 'Please provide a cancellation reason');
+      return;
+    }
 
+    try {
+      await handleStatusUpdate(InstallationStatus.CANCELLED, { cancellationReason });
+      cancelActionSheetRef.current?.hide();
+      setCancellationReason('');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to cancel request');
+    }
+  };
+
+  const createInstallationSchedule = async (agentId?: string, scheduledDateTime?: Date) => {
+    try {
+      const payload: any = {
+        installationRequestId: id,
+        assignedToId: agentId,
+        scheduledDate: scheduledDateTime ? scheduledDateTime.toISOString() : new Date().toISOString(),
+        description: `${user?.name || 'Admin'} scheduled installation`
+      };
+
+      const result = await apiService.post('/service-requests/installation', payload);
+      console.log('Installation scheduled:', result);
+      await fetchRequestDetails();
       agentActionSheetRef.current?.hide();
-      Alert.alert('Success', `Agent ${agentName} assigned to order`);
+      Alert.alert('Success', 'Installation scheduled successfully');
+    } catch (error) {
+      console.log('Failed to schedule installation:', error);
+      Alert.alert('Error', 'Failed to schedule installation');
+    }
+  };
+
+  const handleAgentAssignment = async (agentId: string, agentName: string) => {
+    try {
+      await createInstallationSchedule(agentId, scheduledDate);
     } catch (error) {
       console.log('Failed to assign agent:', error);
       Alert.alert('Error', 'Failed to assign agent');
-    }
-  };
-
-  const handlePaymentUpdate = async (status: PaymentStatus) => {
-    try {
-      const result = await apiService.put(`/orders/${id}/payment`, { paymentStatus: status });
-
-      // Refetch order details to get updated data
-      await fetchOrderDetails();
-
-      paymentActionSheetRef.current?.hide();
-      Alert.alert('Success', `Payment status updated to ${getPaymentStatusDisplayName(status)}`);
-    } catch (error) {
-      console.log('Failed to update payment status:', error);
-      Alert.alert('Error', 'Failed to update payment status');
     }
   };
 
@@ -204,52 +242,68 @@ export const OrderDetailsScreen = () => {
     Linking.openURL(`whatsapp://send?phone=${cleanNumber}`);
   };
 
-  // Display name mappings for better UX
-  const getStatusDisplayName = (status: OrderStatus): string => {
+  const handleCompleteInstallation = () => {
+    router.push(`/orders/${id}/complete`);
+  };
+
+  // Get available status transitions based on current status
+  const getAvailableStatusTransitions = (currentStatus: InstallationStatus) => {
+    switch (currentStatus) {
+      case InstallationStatus.SUBMITTED:
+        return [
+          InstallationStatus.FRANCHISE_CONTACTED,
+          InstallationStatus.REJECTED
+        ];
+      case InstallationStatus.FRANCHISE_CONTACTED:
+        return [
+          InstallationStatus.INSTALLATION_SCHEDULED,
+          InstallationStatus.CANCELLED
+        ];
+      case InstallationStatus.INSTALLATION_SCHEDULED:
+        return [
+          InstallationStatus.INSTALLATION_IN_PROGRESS,
+          InstallationStatus.CANCELLED
+        ];
+      case InstallationStatus.INSTALLATION_IN_PROGRESS:
+        return [
+          InstallationStatus.INSTALLATION_COMPLETED,
+          InstallationStatus.CANCELLED
+        ];
+      case InstallationStatus.CANCELLED:
+        return [
+          InstallationStatus.FRANCHISE_CONTACTED,
+          InstallationStatus.INSTALLATION_SCHEDULED,
+          InstallationStatus.INSTALLATION_IN_PROGRESS
+        ];
+      default:
+        return [];
+    }
+  };
+
+  // Display name mappings
+  const getStatusDisplayName = (status: InstallationStatus): string => {
     switch (status) {
-      case OrderStatus.CREATED: return 'Created';
-      case OrderStatus.PAYMENT_PENDING: return 'Payment Pending';
-      case OrderStatus.PAYMENT_COMPLETED: return 'Payment Completed';
-      case OrderStatus.ASSIGNED: return 'Assigned';
-      case OrderStatus.INSTALLATION_PENDING: return 'Installation Pending';
-      case OrderStatus.INSTALLED: return 'Installed';
-      case OrderStatus.CANCELLED: return 'Cancelled';
-      case OrderStatus.COMPLETED: return 'Completed';
+      case InstallationStatus.SUBMITTED: return 'Submitted';
+      case InstallationStatus.FRANCHISE_CONTACTED: return 'Franchise Contacted';
+      case InstallationStatus.INSTALLATION_SCHEDULED: return 'Scheduled';
+      case InstallationStatus.INSTALLATION_IN_PROGRESS: return 'In Progress';
+      case InstallationStatus.INSTALLATION_COMPLETED: return 'Completed';
+      case InstallationStatus.CANCELLED: return 'Cancelled';
+      case InstallationStatus.REJECTED: return 'Rejected';
       default: return status;
     }
   };
 
-  const getPaymentStatusDisplayName = (status: PaymentStatus): string => {
+  const getStatusColor = (status: InstallationStatus) => {
     switch (status) {
-      case PaymentStatus.PENDING: return 'Pending';
-      case PaymentStatus.COMPLETED: return 'Completed';
-      case PaymentStatus.FAILED: return 'Failed';
-      case PaymentStatus.REFUNDED: return 'Refunded';
-      default: return status;
-    }
-  };
-
-  const getStatusColor = (status: OrderStatus) => {
-    switch (status) {
-      case OrderStatus.CREATED: return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
-      case OrderStatus.PAYMENT_PENDING: return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
-      case OrderStatus.PAYMENT_COMPLETED: return { bg: '#ECFDF5', text: '#047857', dot: '#10B981' };
-      case OrderStatus.ASSIGNED: return { bg: '#EEF2FF', text: '#3730A3', dot: '#4F46E5' };
-      case OrderStatus.INSTALLATION_PENDING: return { bg: '#FEF3C7', text: '#92400E', dot: '#F59E0B' };
-      case OrderStatus.INSTALLED: return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6' };
-      case OrderStatus.COMPLETED: return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
-      case OrderStatus.CANCELLED: return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444' };
+      case InstallationStatus.SUBMITTED: return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
+      case InstallationStatus.FRANCHISE_CONTACTED: return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6' };
+      case InstallationStatus.INSTALLATION_SCHEDULED: return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B' };
+      case InstallationStatus.INSTALLATION_IN_PROGRESS: return { bg: '#ECFDF5', text: '#047857', dot: '#10B981' };
+      case InstallationStatus.INSTALLATION_COMPLETED: return { bg: '#D1FAE5', text: '#047857', dot: '#059669' };
+      case InstallationStatus.CANCELLED: return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444' };
+      case InstallationStatus.REJECTED: return { bg: '#FEF2F2', text: '#DC2626', dot: '#DC2626' };
       default: return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280' };
-    }
-  };
-
-  const getPaymentStatusColor = (status: PaymentStatus) => {
-    switch (status) {
-      case PaymentStatus.COMPLETED: return { bg: '#ECFDF5', text: '#047857' };
-      case PaymentStatus.PENDING: return { bg: '#FFFBEB', text: '#92400E' };
-      case PaymentStatus.FAILED: return { bg: '#FEF2F2', text: '#DC2626' };
-      case PaymentStatus.REFUNDED: return { bg: '#F3E8FF', text: '#6B21A8' };
-      default: return { bg: '#F9FAFB', text: '#6B7280' };
     }
   };
 
@@ -267,38 +321,72 @@ export const OrderDetailsScreen = () => {
     });
   };
 
-  const statusOptions = [
-    { key: OrderStatus.CREATED, label: 'Created', icon: 'add-circle' },
-    { key: OrderStatus.PAYMENT_PENDING, label: 'Payment Pending', icon: 'time' },
-    { key: OrderStatus.PAYMENT_COMPLETED, label: 'Payment Completed', icon: 'checkmark-circle' },
-    { key: OrderStatus.ASSIGNED, label: 'Assigned', icon: 'person-add' },
-    { key: OrderStatus.INSTALLATION_PENDING, label: 'Installation Pending', icon: 'construct' },
-    { key: OrderStatus.INSTALLED, label: 'Installed', icon: 'build' },
-    { key: OrderStatus.COMPLETED, label: 'Completed', icon: 'checkmark-done' },
-    { key: OrderStatus.CANCELLED, label: 'Cancelled', icon: 'close-circle' },
-  ];
+  const formatDateForDisplay = (date: Date) => {
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-  const paymentOptions = [
-    { key: PaymentStatus.PENDING, label: 'Pending', icon: 'time' },
-    { key: PaymentStatus.COMPLETED, label: 'Completed', icon: 'checkmark-circle' },
-    { key: PaymentStatus.FAILED, label: 'Failed', icon: 'close-circle' },
-    { key: PaymentStatus.REFUNDED, label: 'Refunded', icon: 'return-up-back' },
-  ];
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    
+    if (selectedDate) {
+      setScheduledDate(selectedDate);
+      if (Platform.OS === 'android') {
+        // Show time picker after date is selected on Android
+        setShowTimePicker(true);
+      }
+    }
+  };
+
+  const handleTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    
+    if (selectedTime) {
+      const newDateTime = new Date(scheduledDate);
+      newDateTime.setHours(selectedTime.getHours());
+      newDateTime.setMinutes(selectedTime.getMinutes());
+      setScheduledDate(newDateTime);
+    }
+  };
+
+  const getPriceForOrderType = (request: InstallationRequest) => {
+    return request.orderType === 'RENTAL' ? request.product?.rentPrice : request.product?.buyPrice;
+  };
+
+  const getActionTypeDisplayName = (actionType: string) => {
+    switch (actionType) {
+      case 'INSTALLATION_REQUEST_SUBMITTED': return 'Request Submitted';
+      case 'INSTALLATION_REQUEST_CONTACTED': return 'Franchise Contacted';
+      case 'INSTALLATION_REQUEST_SCHEDULED': return 'Installation Scheduled';
+      case 'INSTALLATION_REQUEST_IN_PROGRESS': return 'Installation Started';
+      case 'INSTALLATION_REQUEST_COMPLETED': return 'Installation Completed';
+      case 'INSTALLATION_REQUEST_CANCELLED': return 'Request Cancelled';
+      case 'INSTALLATION_REQUEST_REJECTED': return 'Request Rejected';
+      default: return actionType.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    }
+  };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading order details...</Text>
+        <Text style={styles.loadingText}>Loading request details...</Text>
       </View>
     );
   }
 
-  if (!order) {
+  if (!request) {
     return (
       <View style={styles.errorContainer}>
-        <MaterialIcons name="receipt" size={48} color="#9CA3AF" />
-        <Text style={styles.errorTitle}>Order Not Found</Text>
-        <Text style={styles.errorSubtitle}>The order you're looking for doesn't exist</Text>
+        <MaterialIcons name="build" size={48} color="#9CA3AF" />
+        <Text style={styles.errorTitle}>Request Not Found</Text>
+        <Text style={styles.errorSubtitle}>The installation request you're looking for doesn't exist</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
@@ -306,69 +394,163 @@ export const OrderDetailsScreen = () => {
     );
   }
 
-  const statusColors = getStatusColor(order.status);
-  const paymentColors = getPaymentStatusColor(order.paymentStatus);
+  const statusColors = getStatusColor(request.status);
+  const availableTransitions = getAvailableStatusTransitions(request.status);
 
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#3B82F6" barStyle="light-content" />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Order Summary Card */}
+        {/* Request Summary Card */}
         <View style={styles.summaryCard}>
-          <View style={styles.orderHeader}>
-            <View style={styles.orderInfo}>
-              <Text style={styles.orderId}>#{order.id?.slice(-6)?.toUpperCase()}</Text>
+          <View style={styles.requestHeader}>
+            <View style={styles.requestInfo}>
+              <Text style={styles.requestId}>#{request.id?.slice(-6)?.toUpperCase()}</Text>
               <View style={[styles.orderTypeBadge, {
-                backgroundColor: order.type === 'RENT' ? '#ECFDF5' : '#FFFBEB'
+                backgroundColor: request.orderType === 'RENTAL' ? '#ECFDF5' : '#FFFBEB'
               }]}>
                 <Text style={[styles.orderTypeText, {
-                  color: order.type === 'RENT' ? '#047857' : '#92400E'
+                  color: request.orderType === 'RENTAL' ? '#047857' : '#92400E'
                 }]}>
-                  {order.type === 'RENT' ? 'Rental' : 'Purchase'}
+                  {request.orderType}
                 </Text>
               </View>
             </View>
-            <Text style={styles.orderDate}>{formatDate(order.createdAt)}</Text>
+            <Text style={styles.requestDate}>{formatDate(request.createdAt)}</Text>
           </View>
 
-          <View style={styles.statusPaymentRow}>
-            <TouchableOpacity
-              style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}
-              onPress={() => statusActionSheetRef.current?.show()}
-            >
-              <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
-              <Text style={[styles.statusText, { color: statusColors.text }]}>
-                {getStatusDisplayName(order.status)}
-              </Text>
+          <TouchableOpacity
+            style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}
+            onPress={() => user?.role !== UserRole.SERVICE_AGENT ? statusActionSheetRef.current?.show() : undefined}
+          >
+            <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
+            <Text style={[styles.statusText, { color: statusColors.text }]}>
+              {getStatusDisplayName(request.status)}
+            </Text>
+            {user?.role !== UserRole.SERVICE_AGENT && availableTransitions.length > 0 && (
               <Ionicons name="chevron-down" size={12} color={statusColors.text} />
-            </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+           
+          {/* Quick Actions */}
+          {user?.role !== UserRole.SERVICE_AGENT && (
+            <View style={styles.quickActions}>
+              {request.status === InstallationStatus.SUBMITTED && (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleStatusUpdate(InstallationStatus.FRANCHISE_CONTACTED)}
+                  >
+                    <Ionicons name="call" size={16} color="#3B82F6" />
+                    <Text style={styles.actionButtonText}>Contact Franchise</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.dangerActionButton]}
+                    onPress={() => rejectActionSheetRef.current?.show()}
+                  >
+                    <Ionicons name="close" size={16} color="#EF4444" />
+                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Reject</Text>
+                  </TouchableOpacity>
+                </>
+              )}
 
-            <TouchableOpacity
-              style={[styles.paymentBadge, { backgroundColor: paymentColors.bg }]}
-              onPress={() => user?.role === UserRole.SERVICE_AGENT ? () => { } : paymentActionSheetRef.current?.show()}
-            >
-              <Text style={[styles.paymentText, { color: paymentColors.text }]}>
-                {getPaymentStatusDisplayName(order.paymentStatus)}
-              </Text>
-              <Ionicons name="chevron-down" size={12} color={paymentColors.text} />
-            </TouchableOpacity>
-          </View>
+              {request.status === InstallationStatus.FRANCHISE_CONTACTED && (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => agentActionSheetRef.current?.show()}
+                  >
+                    <Ionicons name="person-add" size={16} color="#10B981" />
+                    <Text style={styles.actionButtonText}>Schedule Installation</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.dangerActionButton]}
+                    onPress={() => cancelActionSheetRef.current?.show()}
+                  >
+                    <Ionicons name="close-circle" size={16} color="#EF4444" />
+                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {request.status === InstallationStatus.INSTALLATION_SCHEDULED && (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleStatusUpdate(InstallationStatus.INSTALLATION_IN_PROGRESS)}
+                  >
+                    <Ionicons name="construct" size={16} color="#F59E0B" />
+                    <Text style={styles.actionButtonText}>Start Installation</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.dangerActionButton]}
+                    onPress={() => cancelActionSheetRef.current?.show()}
+                  >
+                    <Ionicons name="close-circle" size={16} color="#EF4444" />
+                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {request.status === InstallationStatus.INSTALLATION_IN_PROGRESS && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.primaryActionButton]}
+                    onPress={handleCompleteInstallation}
+                  >
+                    <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
+                    <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>Complete Installation</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.dangerActionButton]}
+                    onPress={() => cancelActionSheetRef.current?.show()}
+                  >
+                    <Ionicons name="close-circle" size={16} color="#EF4444" />
+                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {request.status === InstallationStatus.CANCELLED && (
+                <>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleStatusUpdate(InstallationStatus.FRANCHISE_CONTACTED)}
+                  >
+                    <Ionicons name="refresh" size={16} color="#10B981" />
+                    <Text style={styles.actionButtonText}>Reactivate</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => agentActionSheetRef.current?.show()}
+                  >
+                    <Ionicons name="calendar" size={16} color="#F59E0B" />
+                    <Text style={styles.actionButtonText}>Reschedule</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Product Details */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Product Details</Text>
           <View style={styles.productSection}>
-            {order.productImage && (
-              <Image source={{ uri: order.productImage }} style={styles.productImage} />
-            )}
             <View style={styles.productInfo}>
-              <Text style={styles.productName}>{order.productName}</Text>
-              {order.productDescription && order.productDescription.length > 0 && (
-                <Text style={styles.productDescription} numberOfLines={2}>
-                  {order.productDescription}
+              <Text style={styles.productName}>{request.product?.name}</Text>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>
+                  {request.orderType === 'RENTAL' ? 'Rental Price:' : 'Purchase Price:'}
                 </Text>
+                <Text style={styles.priceValue}>{formatCurrency(getPriceForOrderType(request))}</Text>
+              </View>
+              {request.product?.deposit > 0 && (
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceLabel}>Deposit:</Text>
+                  <Text style={styles.depositValue}>{formatCurrency(request.product.deposit)}</Text>
+                </View>
               )}
             </View>
           </View>
@@ -379,167 +561,152 @@ export const OrderDetailsScreen = () => {
           <Text style={styles.cardTitle}>Customer Details</Text>
           <View style={styles.customerSection}>
             <View style={styles.customerInfo}>
-              <Ionicons name="person" size={20} color="#6B7280" />
-              <Text style={styles.customerName}>{order.customerName}</Text>
+              <View style={styles.customerNameRow}>
+                <Ionicons name="person" size={20} color="#6B7280" />
+                <Text style={styles.customerName}>{request.customer?.name || request.name}</Text>
+              </View>
             </View>
 
             <View style={styles.contactRow}>
               <View style={styles.contactInfo}>
                 <Ionicons name="call" size={16} color="#6B7280" />
-                <Text style={styles.contactText}>{order.customerPhone}</Text>
+                <Text style={styles.contactText}>{request.customer?.phone || request.phoneNumber}</Text>
               </View>
               <View style={styles.contactActions}>
                 <TouchableOpacity
                   style={styles.contactButton}
-                  onPress={() => handlePhoneCall(order.customerPhone)}
+                  onPress={() => handlePhoneCall(request.customer?.phone || request.phoneNumber)}
                 >
                   <Ionicons name="call" size={16} color="#3B82F6" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.contactButton}
-                  onPress={() => handleWhatsApp(order.customerPhone)}
+                  onPress={() => handleWhatsApp(request.customer?.phone || request.phoneNumber)}
                 >
                   <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
                 </TouchableOpacity>
               </View>
             </View>
 
-            {order.customerEmail && order.customerEmail !== 'N/A' && (
-              <View style={styles.contactInfo}>
-                <Ionicons name="mail" size={16} color="#6B7280" />
-                <Text style={styles.contactText}>{order.customerEmail}</Text>
-              </View>
-            )}
-
-            {order.customerAddress && order.customerAddress !== 'N/A' && (
-              <View style={styles.addressInfo}>
-                <Ionicons name="location" size={16} color="#6B7280" />
-                <Text style={styles.addressText}>{order.customerAddress}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Payment Details */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Payment Details</Text>
-          <View style={styles.paymentSection}>
-            <View style={styles.paymentRow}>
-              <Text style={styles.paymentLabel}>Total Amount</Text>
-              <Text style={styles.paymentAmount}>{formatCurrency(order.totalAmount)}</Text>
+            <View style={styles.addressInfo}>
+              <Ionicons name="location" size={16} color="#6B7280" />
+              <Text style={styles.addressText}>{request.installationAddress}</Text>
             </View>
-            {order.paidAmount && order.paidAmount > 0 && (
-              <View style={styles.paymentRow}>
-                <Text style={styles.paymentLabel}>Paid Amount</Text>
-                <Text style={[styles.paymentAmount, { color: '#10B981' }]}>
-                  {formatCurrency(order.paidAmount)}
-                </Text>
-              </View>
-            )}
-            {order.pendingAmount && order.pendingAmount > 0 && (
-              <View style={styles.paymentRow}>
-                <Text style={styles.paymentLabel}>Pending Amount</Text>
-                <Text style={[styles.paymentAmount, { color: '#F59E0B' }]}>
-                  {formatCurrency(order.pendingAmount)}
-                </Text>
-              </View>
-            )}
           </View>
         </View>
 
-        {/* Service Agent */}
+        {/* Franchise Details */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Franchise Details</Text>
+          <View style={styles.franchiseSection}>
+            <View style={styles.franchiseInfo}>
+              <Ionicons name="business" size={20} color="#6B7280" />
+              <View style={styles.franchiseDetails}>
+                <Text style={styles.franchiseName}>{request.franchise?.name}</Text>
+                <Text style={styles.franchiseCity}>{request.franchise?.city}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Assigned Technician */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Service Agent</Text>
-            {
-              user?.role !== UserRole.SERVICE_AGENT && <TouchableOpacity
+            <Text style={styles.cardTitle}>Assigned Technician</Text>
+            {user?.role !== UserRole.SERVICE_AGENT && request.status === InstallationStatus.FRANCHISE_CONTACTED && (
+              <TouchableOpacity
                 style={styles.assignButton}
                 onPress={() => agentActionSheetRef.current?.show()}
               >
                 <Ionicons name="person-add" size={14} color="#3B82F6" />
                 <Text style={styles.assignButtonText}>
-                  {order.serviceAgentName ? 'Change' : 'Assign'}
+                  {request.assignedTechnician ? 'Change' : 'Assign'}
                 </Text>
               </TouchableOpacity>
-            }
-
+            )}
           </View>
 
-          {order.serviceAgentName ? (
-            <View style={styles.agentSection}>
-              <View style={styles.agentInfo}>
+          {request.assignedTechnician ? (
+            <View style={styles.technicianSection}>
+              <View style={styles.technicianInfo}>
                 <Ionicons name="person-circle" size={20} color="#6B7280" />
-                <Text style={styles.agentName}>{order.serviceAgentName}</Text>
+                <Text style={styles.technicianName}>{request.assignedTechnician?.name}</Text>
               </View>
-              {order.serviceAgentPhone && (
-                <View style={styles.contactRow}>
-                  <View style={styles.contactInfo}>
-                    <Ionicons name="call" size={16} color="#6B7280" />
-                    <Text style={styles.contactText}>{order.serviceAgentPhone}</Text>
-                  </View>
-                  <View style={styles.contactActions}>
-                    <TouchableOpacity
-                      style={styles.contactButton}
-                      onPress={() => handlePhoneCall(order.serviceAgentPhone!)}
-                    >
-                      <Ionicons name="call" size={16} color="#3B82F6" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.contactButton}
-                      onPress={() => handleWhatsApp(order.serviceAgentPhone!)}
-                    >
-                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
             </View>
           ) : (
-            <TouchableOpacity
-              style={styles.noAgentSection}
-              onPress={() => agentActionSheetRef.current?.show()}
-            >
-              <View style={styles.noAgentIcon}>
+            <View style={styles.noTechnicianSection}>
+              <View style={styles.noTechnicianIcon}>
                 <Ionicons name="person-add" size={24} color="#3B82F6" />
               </View>
-              <Text style={styles.noAgentText}>Tap to assign service agent</Text>
-              <Text style={styles.noAgentSubtext}>No agent assigned yet</Text>
-            </TouchableOpacity>
+              <Text style={styles.noTechnicianText}>No technician assigned yet</Text>
+            </View>
           )}
         </View>
 
         {/* Schedule Details */}
-        {(order.deliveryDate || order.installationDate) && (
+        {request.scheduledDate && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Schedule Details</Text>
             <View style={styles.scheduleSection}>
-              {order.deliveryDate && (
-                <View style={styles.scheduleRow}>
-                  <Ionicons name="car" size={20} color="#8B5CF6" />
-                  <View style={styles.scheduleInfo}>
-                    <Text style={styles.scheduleLabel}>Delivery Date</Text>
-                    <Text style={styles.scheduleDate}>{formatDate(order.deliveryDate)}</Text>
-                  </View>
+              <View style={styles.scheduleRow}>
+                <Ionicons name="calendar" size={20} color="#F59E0B" />
+                <View style={styles.scheduleInfo}>
+                  <Text style={styles.scheduleLabel}>Scheduled Date</Text>
+                  <Text style={styles.scheduleDate}>{formatDate(request.scheduledDate)}</Text>
                 </View>
-              )}
-              {order.installationDate && (
-                <View style={styles.scheduleRow}>
-                  <Ionicons name="construct" size={20} color="#F59E0B" />
-                  <View style={styles.scheduleInfo}>
-                    <Text style={styles.scheduleLabel}>Installation Date</Text>
-                    <Text style={styles.scheduleDate}>{formatDate(order.installationDate)}</Text>
-                  </View>
-                </View>
-              )}
+              </View>
             </View>
           </View>
         )}
 
-        {/* Notes */}
-        {order.notes && order.notes.length > 0 && (
+        {/* Rejection Reason */}
+        {request.rejectionReason && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Notes</Text>
-            <Text style={styles.notesText}>{order.notes}</Text>
+            <Text style={styles.cardTitle}>Rejection Reason</Text>
+            <View style={styles.rejectionSection}>
+              <Ionicons name="warning" size={20} color="#EF4444" />
+              <Text style={styles.rejectionText}>{request.rejectionReason}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Action History */}
+        {request.actionHistory && request.actionHistory.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Action History</Text>
+            <View style={styles.actionHistorySection}>
+              {request.actionHistory.map((action, index) => (
+                <View key={action.id} style={styles.actionHistoryItem}>
+                  <View style={styles.actionHistoryHeader}>
+                    <Text style={styles.actionHistoryAction}>
+                      {getActionTypeDisplayName(action.actionType)}
+                    </Text>
+                    <Text style={styles.actionHistoryDate}>
+                      {formatDate(action.createdAt)}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.actionHistoryDetails}>
+                    <Text style={styles.actionHistoryRole}>
+                      by {action.performedByRole}
+                    </Text>
+                    {action.fromStatus && (
+                      <Text style={styles.actionHistoryStatus}>
+                        {getStatusDisplayName(action.fromStatus as InstallationStatus)} → {getStatusDisplayName(action.toStatus as InstallationStatus)}
+                      </Text>
+                    )}
+                  </View>
+                  
+                  {action.comment && (
+                    <Text style={styles.actionHistoryComment}>{action.comment}</Text>
+                  )}
+                  
+                  {index < request.actionHistory.length - 1 && (
+                    <View style={styles.actionHistoryDivider} />
+                  )}
+                </View>
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -549,45 +716,118 @@ export const OrderDetailsScreen = () => {
       {/* Status Update Action Sheet */}
       <ActionSheet ref={statusActionSheetRef}>
         <View style={styles.actionSheetContent}>
-          <Text style={styles.actionSheetTitle}>Update Order Status</Text>
-          {statusOptions.map((option) => (
+          <Text style={styles.actionSheetTitle}>Update Request Status</Text>
+
+          <TextInput
+            style={styles.commentInput}
+            placeholder="Add a comment (optional)"
+            value={comment}
+            onChangeText={setComment}
+            multiline
+            numberOfLines={3}
+          />
+
+          {availableTransitions.map((status) => (
             <TouchableOpacity
-              key={option.key}
-              style={[
-                styles.actionSheetOption,
-                order.status === option.key && styles.activeOption
-              ]}
-              onPress={() => handleStatusUpdate(option.key)}
+              key={status}
+              style={styles.actionSheetOption}
+              onPress={() => handleStatusUpdate(status)}
             >
-              <Ionicons name={option.icon as any} size={20} color="#374151" />
-              <Text style={styles.actionSheetOptionText}>{option.label}</Text>
-              {order.status === option.key && (
-                <Ionicons name="checkmark" size={20} color="#10B981" />
-              )}
+              <Ionicons name="arrow-forward" size={20} color="#374151" />
+              <Text style={styles.actionSheetOptionText}>{getStatusDisplayName(status)}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </ActionSheet>
 
       {/* Agent Assignment Action Sheet */}
-      <ActionSheet ref={agentActionSheetRef}>
+      <ActionSheet ref={agentActionSheetRef}
+        snapPoints={[70, 90]}
+        initialSnapIndex={0}
+        gestureEnabled={true}
+        closeOnTouchBackdrop={true}
+        containerStyle={{
+          backgroundColor: '#FFFFFF',
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          minHeight: Dimensions.get('window').height * 0.7,
+        }}
+        drawUnderStatusBar={false}
+        statusBarTranslucent={false}
+        defaultOverlayOpacity={0.3}>
         <View style={styles.actionSheetContent}>
-          <Text style={styles.actionSheetTitle}>Assign Service Agent</Text>
-          {serviceAgents && serviceAgents?.map((agent) => (
+          <Text style={styles.actionSheetTitle}>Schedule Installation</Text>
+
+          <View style={styles.datePickerContainer}>
+            <Text style={styles.datePickerLabel}>Scheduled Date & Time</Text>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar" size={20} color="#6B7280" />
+              <Text style={styles.datePickerText}>
+                {formatDateForDisplay(scheduledDate)}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={scheduledDate}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleDateChange}
+              minimumDate={new Date()}
+            />
+          )}
+
+          {showTimePicker && Platform.OS === 'android' && (
+            <DateTimePicker
+              value={scheduledDate}
+              mode="time"
+              display="default"
+              onChange={handleTimeChange}
+            />
+          )}
+
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={styles.timePickerButton}
+              onPress={() => setShowTimePicker(!showTimePicker)}
+            >
+              <Ionicons name="time" size={20} color="#6B7280" />
+              <Text style={styles.datePickerText}>
+                {showTimePicker ? 'Hide Time Picker' : 'Set Time'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {showTimePicker && Platform.OS === 'ios' && (
+            <DateTimePicker
+              value={scheduledDate}
+              mode="time"
+              display="spinner"
+              onChange={handleTimeChange}
+            />
+          )}
+
+          {serviceAgents && serviceAgents.map((agent) => (
             <TouchableOpacity
               key={agent.id}
               style={[
                 styles.actionSheetOption,
-                order.serviceAgentId === agent.id && styles.activeOption
+                request.assignedTechnicianId === agent.id && styles.activeOption
               ]}
-              onPress={() => handleAgentAssignment(agent.id, agent.name, agent.phone)}
+              onPress={() => handleAgentAssignment(agent.id, agent.name)}
             >
               <Ionicons name="person-circle" size={20} color="#374151" />
               <View style={styles.agentOptionInfo}>
                 <Text style={styles.actionSheetOptionText}>{agent.name}</Text>
                 <Text style={styles.agentOptionPhone}>{agent.phone}</Text>
+                <Text style={styles.agentOptionRole}>{agent.role} {agent.isPrimary ? '(Primary)' : ''}</Text>
               </View>
-              {order.serviceAgentId === agent.id && (
+              {request.assignedTechnicianId === agent.id && (
                 <Ionicons name="checkmark" size={20} color="#10B981" />
               )}
             </TouchableOpacity>
@@ -595,57 +835,50 @@ export const OrderDetailsScreen = () => {
         </View>
       </ActionSheet>
 
-      {/* Payment Status Action Sheet */}
-      <ActionSheet ref={paymentActionSheetRef}>
+      {/* Reject Request Action Sheet */}
+      <ActionSheet ref={rejectActionSheetRef}>
         <View style={styles.actionSheetContent}>
-          <Text style={styles.actionSheetTitle}>Update Payment Status</Text>
-          {paymentOptions.map((option) => (
-            <TouchableOpacity
-              key={option.key}
-              style={[
-                styles.actionSheetOption,
-                order.paymentStatus === option.key && styles.activeOption
-              ]}
-              onPress={() => handlePaymentUpdate(option.key)}
-            >
-              <Ionicons name={option.icon as any} size={20} color="#374151" />
-              <Text style={styles.actionSheetOptionText}>{option.label}</Text>
-              {order.paymentStatus === option.key && (
-                <Ionicons name="checkmark" size={20} color="#10B981" />
-              )}
-            </TouchableOpacity>
-          ))}
+          <Text style={styles.actionSheetTitle}>Reject Request</Text>
+          <Text style={styles.actionSheetSubtitle}>Please provide a reason for rejection</Text>
+
+          <TextInput
+            style={styles.rejectionInput}
+            placeholder="Rejection reason"
+            value={rejectionReason}
+            onChangeText={setRejectionReason}
+            multiline
+            numberOfLines={4}
+          />
+
+          <TouchableOpacity
+            style={[styles.submitButton, styles.dangerSubmitButton]}
+            onPress={handleRejectRequest}
+          >
+            <Text style={styles.submitButtonText}>Reject Request</Text>
+          </TouchableOpacity>
         </View>
       </ActionSheet>
 
-      {/* More Actions Action Sheet */}
-      <ActionSheet ref={moreActionsSheetRef}>
+      {/* Cancel Request Action Sheet */}
+      <ActionSheet ref={cancelActionSheetRef}>
         <View style={styles.actionSheetContent}>
-          <Text style={styles.actionSheetTitle}>More Actions</Text>
+          <Text style={styles.actionSheetTitle}>Cancel Request</Text>
+          <Text style={styles.actionSheetSubtitle}>Please provide a reason for cancellation</Text>
 
-          <TouchableOpacity style={styles.actionSheetOption}>
-            <Ionicons name="document-text" size={20} color="#374151" />
-            <Text style={styles.actionSheetOptionText}>Generate Invoice</Text>
-          </TouchableOpacity>
+          <TextInput
+            style={styles.rejectionInput}
+            placeholder="Cancellation reason"
+            value={cancellationReason}
+            onChangeText={setCancellationReason}
+            multiline
+            numberOfLines={4}
+          />
 
-          <TouchableOpacity style={styles.actionSheetOption}>
-            <Ionicons name="share" size={20} color="#374151" />
-            <Text style={styles.actionSheetOptionText}>Share Order Details</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionSheetOption}>
-            <Ionicons name="create" size={20} color="#374151" />
-            <Text style={styles.actionSheetOptionText}>Edit Order</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionSheetOption}>
-            <Ionicons name="copy" size={20} color="#374151" />
-            <Text style={styles.actionSheetOptionText}>Duplicate Order</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.actionSheetOption, styles.dangerOption]}>
-            <Ionicons name="trash" size={20} color="#EF4444" />
-            <Text style={[styles.actionSheetOptionText, styles.dangerText]}>Delete Order</Text>
+          <TouchableOpacity
+            style={[styles.submitButton, styles.dangerSubmitButton]}
+            onPress={handleCancelRequest}
+          >
+            <Text style={styles.submitButtonText}>Cancel Request</Text>
           </TouchableOpacity>
         </View>
       </ActionSheet>
@@ -653,7 +886,7 @@ export const OrderDetailsScreen = () => {
   );
 };
 
-export default OrderDetailsScreen;
+export default InstallationRequestDetailsScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -703,20 +936,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Outfit_500Medium',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    paddingTop: 50,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#FFFFFF',
-  },
   scrollView: {
     flex: 1,
     paddingHorizontal: 16,
@@ -733,17 +952,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  orderHeader: {
+  requestHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 16,
   },
-  orderInfo: {
+  requestInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  orderId: {
+  requestId: {
     fontSize: 20,
     fontFamily: 'Outfit_700Bold',
     color: '#111827',
@@ -758,15 +977,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Outfit_500Medium',
   },
-  orderDate: {
+  requestDate: {
     fontSize: 14,
     fontFamily: 'Outfit_400Regular',
     color: '#6B7280',
-  },
-  statusPaymentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -774,6 +988,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 24,
+    marginBottom: 16,
+    alignSelf: 'flex-start',
   },
   statusDot: {
     width: 8,
@@ -784,21 +1000,36 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
     fontFamily: 'Outfit_500Medium',
-    textTransform: 'capitalize',
     marginRight: 4,
   },
-  paymentBadge: {
+  quickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 12,
-    borderRadius: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  paymentText: {
+  primaryActionButton: {
+    backgroundColor: '#3B82F6',
+    borderColor: '#3B82F6',
+  },
+  dangerActionButton: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  actionButtonText: {
     fontSize: 12,
     fontFamily: 'Outfit_500Medium',
-    textTransform: 'capitalize',
-    marginRight: 4,
+    color: '#374151',
+    marginLeft: 4,
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -824,6 +1055,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   assignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#EEF2FF',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -833,35 +1066,46 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Outfit_500Medium',
     color: '#3B82F6',
+    marginLeft: 4,
   },
   productSection: {
-    flexDirection: 'row',
-  },
-  productImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    marginRight: 16,
+    gap: 12,
   },
   productInfo: {
-    flex: 1,
+    gap: 8,
   },
   productName: {
+    fontSize: 18,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#111827',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  priceLabel: {
+    fontSize: 14,
+    fontFamily: 'Outfit_500Medium',
+    color: '#6B7280',
+  },
+  priceValue: {
     fontSize: 16,
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
-    marginBottom: 4,
   },
-  productDescription: {
-    fontSize: 14,
-    fontFamily: 'Outfit_400Regular',
-    color: '#6B7280',
-    lineHeight: 20,
+  depositValue: {
+    fontSize: 16,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#F59E0B',
   },
   customerSection: {
     gap: 12,
   },
   customerInfo: {
+    gap: 8,
+  },
+  customerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -911,49 +1155,59 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 20,
   },
-  paymentSection: {
+  franchiseSection: {
     gap: 12,
   },
-  paymentRow: {
+  franchiseInfo: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  paymentLabel: {
-    fontSize: 14,
-    fontFamily: 'Outfit_500Medium',
-    color: '#6B7280',
+  franchiseDetails: {
+    marginLeft: 8,
   },
-  paymentAmount: {
+  franchiseName: {
     fontSize: 16,
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
   },
-  agentSection: {
+  franchiseCity: {
+    fontSize: 14,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+  },
+  technicianSection: {
     gap: 12,
   },
-  agentInfo: {
+  technicianInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  agentName: {
+  technicianName: {
     fontSize: 16,
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
     marginLeft: 8,
   },
-  noAgentSection: {
+  noTechnicianSection: {
     alignItems: 'center',
     paddingVertical: 20,
   },
-  noAgentText: {
+  noTechnicianIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EEF2FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  noTechnicianText: {
     fontSize: 14,
     fontFamily: 'Outfit_400Regular',
-    color: '#9CA3AF',
-    marginTop: 8,
+    color: '#6B7280',
   },
   scheduleSection: {
-    gap: 16,
+    gap: 12,
   },
   scheduleRow: {
     flexDirection: 'row',
@@ -961,67 +1215,192 @@ const styles = StyleSheet.create({
   },
   scheduleInfo: {
     marginLeft: 12,
+    flex: 1,
   },
   scheduleLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Outfit_500Medium',
     color: '#6B7280',
-    marginBottom: 2,
   },
   scheduleDate: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
   },
-  notesText: {
+  rejectionSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  rejectionText: {
     fontSize: 14,
     fontFamily: 'Outfit_400Regular',
-    color: '#374151',
+    color: '#6B7280',
+    flex: 1,
     lineHeight: 20,
   },
-  actionSheetContent: {
-    padding: 20,
-    paddingBottom: 40,
+  actionHistorySection: {
+    gap: 16,
   },
-  actionSheetTitle: {
-    fontSize: 18,
+  actionHistoryItem: {
+    gap: 8,
+  },
+  actionHistoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  actionHistoryAction: {
+    fontSize: 14,
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
-    marginBottom: 20,
-    textAlign: 'center',
+    flex: 1,
+  },
+  actionHistoryDate: {
+    fontSize: 12,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+  },
+  actionHistoryDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  actionHistoryRole: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: '#8B5CF6',
+    textTransform: 'capitalize',
+  },
+  actionHistoryStatus: {
+    fontSize: 12,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+  },
+  actionHistoryComment: {
+    fontSize: 13,
+    fontFamily: 'Outfit_400Regular',
+    color: '#374151',
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  actionHistoryDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginTop: 8,
+  },
+  actionSheetContent: {
+    padding: 16,
+    gap: 12,
+  },
+  actionSheetTitle: {
+    fontSize: 16,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#111827',
+  },
+  actionSheetSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
   },
   actionSheetOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 12,
+    padding: 12,
     borderRadius: 12,
-    marginBottom: 8,
-  },
-  activeOption: {
-    backgroundColor: '#EEF2FF',
+    gap: 12,
   },
   actionSheetOptionText: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Outfit_500Medium',
     color: '#374151',
-    marginLeft: 12,
     flex: 1,
   },
+  activeOption: {
+    backgroundColor: '#F1F5F9',
+  },
   agentOptionInfo: {
-    marginLeft: 12,
     flex: 1,
   },
   agentOptionPhone: {
     fontSize: 12,
     fontFamily: 'Outfit_400Regular',
     color: '#6B7280',
-    marginTop: 2,
   },
-  dangerOption: {
-    backgroundColor: '#FEF2F2',
+  agentOptionRole: {
+    fontSize: 12,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
   },
-  dangerText: {
-    color: '#EF4444',
+  commentInput: {
+    height: 100,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+    textAlignVertical: 'top',
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+  },
+  datePickerContainer: {
+    marginBottom: 16,
+  },
+  datePickerLabel: {
+    fontSize: 14,
+    fontFamily: 'Outfit_500Medium',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  datePickerText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Outfit_400Regular',
+    color: '#374151',
+    marginLeft: 8,
+  },
+  timePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    marginBottom: 12,
+  },
+  rejectionInput: {
+    height: 120,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+    textAlignVertical: 'top',
+  },
+  submitButton: {
+    backgroundColor: '#10B981',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    fontSize: 14,
+    fontFamily: 'Outfit_500Medium',
+    color: '#FFFFFF',
+  },
+  dangerSubmitButton: {
+    backgroundColor: '#EF4444',
   },
 });
