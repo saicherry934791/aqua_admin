@@ -174,7 +174,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('Backend login response:', response);
 
             if (response.success) {
-                const { accessToken, refreshToken, user: userData } = response.data;
+                const { accessToken, refreshToken, user: userData,franchiseId } = response.data;
 
                 // Store tokens and user data
                 await AsyncStorage.multiSet([
@@ -183,7 +183,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     ['userProfile', JSON.stringify(userData)],
                 ]);
 
-                setUser(userData);
+                setUser({...userData,franchiseId});
                 setConfirmation(null); // Clear confirmation after successful verification
                 return true;
             } else {
@@ -355,7 +355,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const tabPermissions: Record<string, UserRole[]> = {
             'index': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Dashboard
             'manage': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER], // Manage tab - only admin and franchise
-            'orders': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Orders
+            'orders': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER], // Orders
             'service': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Service requests
             'notifications': [UserRole.SERVICE_AGENT], // Notifications - only service agents
             'profile': [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT], // Profile
@@ -372,7 +372,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (response.success) {
                 // Only update if not in view-as mode
                 if (!viewAsState.isViewingAs) {
-                    setUser(response.data.user);
+                    setUser({...response.data.user,franchiseId:response.data.franchiseId});
                     await AsyncStorage.setItem('userProfile', JSON.stringify(response.data));
                 }
             }

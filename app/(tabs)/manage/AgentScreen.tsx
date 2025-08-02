@@ -18,7 +18,7 @@ const AgentScreen = () => {
     const { user, viewAsServiceAgent } = useAuth();
     const params = useLocalSearchParams();
 
-    // Track if we need to refresh data
+// Track if we need to refresh data
     const [shouldRefresh, setShouldRefresh] = useState(false);
 
     // Handle refresh when returning from forms

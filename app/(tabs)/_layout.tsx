@@ -46,7 +46,7 @@ export default function TabLayout() {
       name: 'orders',
       title: 'Orders',
       icon: 'shopping-cart' as keyof typeof MaterialIcons.glyphMap,
-      roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER, UserRole.SERVICE_AGENT],
+      roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER],
     },
     {
       name: 'service',

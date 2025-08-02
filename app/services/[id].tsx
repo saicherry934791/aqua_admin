@@ -1,7 +1,7 @@
 import { apiService } from '@/lib/api/api';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { Link, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -9,20 +9,33 @@ import {
     Linking,
     RefreshControl,
     ScrollView,
-    StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
+    Image,
+    StyleSheet
 } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
+import * as ImagePicker from 'expo-image-picker';
 
 // Backend service request statuses
 export enum ServiceRequestStatus {
-    CREATED = 'created',
-    ASSIGNED = 'assigned',
-    IN_PROGRESS = 'in_progress',
-    COMPLETED = 'completed',
-    CANCELLED = 'cancelled',
+    CREATED = 'CREATED',
+    ASSIGNED = 'ASSIGNED',
+    SCHEDULED = 'SCHEDULED',
+    IN_PROGRESS = 'IN_PROGRESS',
+    PAYMENT_PENDING = 'PAYMENT_PENDING',
+    COMPLETED = 'COMPLETED',
+    CANCELLED = 'CANCELLED',
+}
+
+interface PaymentStatus {
+    status: 'PENDING' | 'PAID' | 'FAILED';
+    amount: number;
+    method: string;
+    paidDate?: string;
+    razorpayPaymentLink?: string;
+    razorpaySubscriptionId?: string;
 }
 
 interface ServiceRequest {
@@ -33,23 +46,21 @@ interface ServiceRequest {
     customerAddress: string;
     productId: string;
     productName: string;
-    orderId?: string;
-    type: 'INSTALLATION' | 'MAINTENANCE' | 'REPAIR' | 'REPLACEMENT';
+    type: 'installation' | 'maintenance' | 'repair' | 'replacement';
     description: string;
     status: ServiceRequestStatus;
     assignedToId?: string;
     assignedToName?: string;
-    franchiseAreaId: string;
-    franchiseAreaName: string;
     scheduledDate?: string;
     completedDate?: string;
     createdAt: string;
     updatedAt: string;
     priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
     customerEmail?: string;
-    estimatedDuration?: number;
-    actualDuration?: number;
-    cost?: number;
+    requirePayment: boolean;
+    paymentStatus?: PaymentStatus;
+    beforeImages: string[];
+    afterImages: string[];
 }
 
 const ServiceDetailScreen = () => {
@@ -58,20 +69,17 @@ const ServiceDetailScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [updating, setUpdating] = useState(false);
-    const { user } = useAuth()
-
-    const navigation = useNavigation()
+    const [selectedImages, setSelectedImages] = useState<{ beforeImages: any[], afterImages: any[] }>({
+        beforeImages: [],
+        afterImages: []
+    });
+    const { user } = useAuth();
+    const navigation = useNavigation();
 
     useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: () => (
-                <Text
-                    style={{
-                        fontSize: 20, // equivalent to text-2xl
-                        fontFamily: 'Outfit_500Medium', // equivalent to font-grotesk-bold
-                        color: '#121516',
-                    }}
-                >
+                <Text style={styles.headerTitle}>
                     SERVICES
                 </Text>
             ),
@@ -88,32 +96,34 @@ const ServiceDetailScreen = () => {
                 setServiceRequest(null);
                 return;
             }
-            const data = result.data.serviceRequest;
-            console.log('Service request data:', data);
 
+            const data = result.data.serviceRequest;
+
+            console.log('data sr ', data)
+            // Transform the data to match our interface
             setServiceRequest({
                 id: data.id,
                 customerId: data.customer.id,
                 customerName: data.customer.name,
                 customerPhone: data.customer.phone,
                 customerEmail: data.customer.email,
-                customerAddress: data.customer.address,
+                customerAddress: `${data.customer.city}`, // Assuming address structure
                 productId: data.product.id,
                 productName: data.product.name,
-                orderId: data.orderId,
                 type: data.type,
-                description: data.product.description,
-                status: data.status, // Use backend status directly
-                assignedToId: data.assignedToId,
-                assignedToName: data.assignedTo?.name || null,
-                franchiseAreaId: data.franchiseAreaId,
-                franchiseAreaName: data.franchiseAreaName || 'Service Area',
+                description: data.description,
+                status: data.status,
+                assignedToId: data.assignedAgent?.id,
+                assignedToName: data.assignedAgent?.name,
                 scheduledDate: data.scheduledDate,
+                completedDate: data.completedDate,
                 createdAt: data.createdAt,
                 updatedAt: data.updatedAt,
-                priority: data.priority || 'MEDIUM',
-                estimatedDuration: data.estimatedDuration || 120,
-                cost: data.cost || 0
+                priority: 'MEDIUM', // Default priority
+                requirePayment: data.requirePayment,
+                paymentStatus: data.paymentStatus,
+                beforeImages: data.beforeImages || [],
+                afterImages: data.afterImages || []
             });
 
         } catch (error) {
@@ -136,36 +146,40 @@ const ServiceDetailScreen = () => {
     const getStatusColor = (status: ServiceRequestStatus) => {
         switch (status) {
             case ServiceRequestStatus.CREATED:
-                return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
+                return { backgroundColor: '#F3F4F6', color: '#374151', borderColor: '#E5E7EB' };
             case ServiceRequestStatus.ASSIGNED:
-                return { bg: '#F3E8FF', text: '#6B21A8', dot: '#8B5CF6', border: '#C4B5FD' };
+                return { backgroundColor: '#F3E8FF', color: '#7C3AED', borderColor: '#E9D5FF' };
+            case ServiceRequestStatus.SCHEDULED:
+                return { backgroundColor: '#DBEAFE', color: '#1D4ED8', borderColor: '#BFDBFE' };
             case ServiceRequestStatus.IN_PROGRESS:
-                return { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B', border: '#FDE68A' };
+                return { backgroundColor: '#FEF3C7', color: '#D97706', borderColor: '#FDE68A' };
+            case ServiceRequestStatus.PAYMENT_PENDING:
+                return { backgroundColor: '#FED7AA', color: '#EA580C', borderColor: '#FDBA74' };
             case ServiceRequestStatus.COMPLETED:
-                return { bg: '#D1FAE5', text: '#047857', dot: '#059669', border: '#6EE7B7' };
+                return { backgroundColor: '#D1FAE5', color: '#059669', borderColor: '#A7F3D0' };
             case ServiceRequestStatus.CANCELLED:
-                return { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444', border: '#FECACA' };
+                return { backgroundColor: '#FEE2E2', color: '#DC2626', borderColor: '#FECACA' };
             default:
-                return { bg: '#F9FAFB', text: '#6B7280', dot: '#6B7280', border: '#E5E7EB' };
+                return { backgroundColor: '#F3F4F6', color: '#374151', borderColor: '#E5E7EB' };
         }
     };
 
     const getPriorityColor = (priority?: string) => {
         switch (priority) {
-            case 'LOW': return { bg: '#F0F9FF', text: '#0369A1', border: '#7DD3FC' };
-            case 'MEDIUM': return { bg: '#FFFBEB', text: '#92400E', border: '#FCD34D' };
-            case 'HIGH': return { bg: '#FEF2F2', text: '#DC2626', border: '#FCA5A5' };
-            case 'URGENT': return { bg: '#7F1D1D', text: '#FFFFFF', border: '#DC2626' };
-            default: return { bg: '#F9FAFB', text: '#6B7280', border: '#D1D5DB' };
+            case 'LOW': return { backgroundColor: '#EFF6FF', color: '#2563EB', borderColor: '#BFDBFE' };
+            case 'MEDIUM': return { backgroundColor: '#FFFBEB', color: '#D97706', borderColor: '#FDE68A' };
+            case 'HIGH': return { backgroundColor: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA' };
+            case 'URGENT': return { backgroundColor: '#7F1D1D', color: '#FFFFFF', borderColor: '#DC2626' };
+            default: return { backgroundColor: '#F9FAFB', color: '#4B5563', borderColor: '#E5E7EB' };
         }
     };
 
     const getServiceTypeIcon = (type: string) => {
         switch (type) {
-            case 'INSTALLATION': return 'construct';
-            case 'MAINTENANCE': return 'settings';
-            case 'REPAIR': return 'build';
-            case 'REPLACEMENT': return 'swap-horizontal';
+            case 'installation': return 'construct';
+            case 'maintenance': return 'settings';
+            case 'repair': return 'build';
+            case 'replacement': return 'swap-horizontal';
             default: return 'cog';
         }
     };
@@ -204,16 +218,106 @@ const ServiceDetailScreen = () => {
         Linking.openURL(`whatsapp://send?phone=${cleanNumber}`);
     };
 
-    const handleDirections = (address: string) => {
-        const encodedAddress = encodeURIComponent(address);
-        Linking.openURL(`https://maps.google.com/?q=${encodedAddress}`);
+    const pickImages = async (type: 'before' | 'after') => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            setSelectedImages(prev => ({
+                ...prev,
+                [`${type}Images`]: result.assets
+            }));
+        }
+    };
+
+    const requiresImages = (currentStatus: ServiceRequestStatus, newStatus: ServiceRequestStatus): 'before' | 'after' | 'both' | null => {
+        // For non-installation types: scheduled -> in_progress needs before images
+        if (serviceRequest?.type !== 'installation' &&
+            currentStatus === ServiceRequestStatus.SCHEDULED &&
+            newStatus === ServiceRequestStatus.IN_PROGRESS) {
+            return 'before';
+        }
+
+        // in_progress -> completed needs after images
+        if (currentStatus === ServiceRequestStatus.IN_PROGRESS &&
+            newStatus === ServiceRequestStatus.COMPLETED) {
+            return 'after';
+        }
+
+        // in_progress -> payment_pending needs after images
+        if (currentStatus === ServiceRequestStatus.IN_PROGRESS &&
+            newStatus === ServiceRequestStatus.PAYMENT_PENDING) {
+            return 'after';
+        }
+
+        return null;
     };
 
     const updateServiceStatus = async (newStatus: ServiceRequestStatus) => {
+        if (!serviceRequest) return;
+
+        const imageRequirement = requiresImages(serviceRequest.status, newStatus);
+
+        // Check if images are required but not provided
+        if (imageRequirement) {
+            const hasRequiredImages = imageRequirement === 'before'
+                ? selectedImages.beforeImages.length > 0
+                : imageRequirement === 'after'
+                    ? selectedImages.afterImages.length > 0
+                    : selectedImages.beforeImages.length > 0 && selectedImages.afterImages.length > 0;
+
+            if (!hasRequiredImages) {
+                Alert.alert(
+                    'Images Required',
+                    `Please upload ${imageRequirement} images to proceed with this status change.`,
+                    [
+                        {
+                            text: 'Upload Images',
+                            onPress: () => {
+                                if (imageRequirement === 'before') pickImages('before');
+                                else if (imageRequirement === 'after') pickImages('after');
+                            }
+                        },
+                        { text: 'Cancel', style: 'cancel' }
+                    ]
+                );
+                return;
+            }
+        }
+
         setUpdating(true);
         try {
-            const result = await apiService.patch(`/service-requests/${id}/status`, {
-                status: newStatus
+            const formData = new FormData();
+            formData.append('status', newStatus);
+
+            // Append images if required
+            if (imageRequirement === 'before' || imageRequirement === 'both') {
+                selectedImages.beforeImages.forEach((image, index) => {
+                    formData.append('beforeImages', {
+                        uri: image.uri,
+                        type: 'image/jpeg',
+                        name: `before_${index}.jpg`,
+                    } as any);
+                });
+            }
+
+            if (imageRequirement === 'after' || imageRequirement === 'both') {
+                selectedImages.afterImages.forEach((image, index) => {
+                    formData.append('afterImages', {
+                        uri: image.uri,
+                        type: 'image/jpeg',
+                        name: `after_${index}.jpg`,
+                    } as any);
+                });
+            }
+
+            const result = await apiService.patch(`/service-requests/${id}/status`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
 
             if (result.success) {
@@ -223,7 +327,10 @@ const ServiceDetailScreen = () => {
                     updatedAt: new Date().toISOString()
                 } : null);
 
-                Alert.alert('Success', `Service request ${getStatusDisplayName(newStatus)}`);
+                // Clear selected images
+                setSelectedImages({ beforeImages: [], afterImages: [] });
+
+                Alert.alert('Success', `Service request updated to ${getStatusDisplayName(newStatus)}`);
             } else {
                 throw new Error(result.error || 'Failed to update status');
             }
@@ -238,7 +345,9 @@ const ServiceDetailScreen = () => {
         switch (status) {
             case ServiceRequestStatus.CREATED: return 'Created';
             case ServiceRequestStatus.ASSIGNED: return 'Assigned';
+            case ServiceRequestStatus.SCHEDULED: return 'Scheduled';
             case ServiceRequestStatus.IN_PROGRESS: return 'In Progress';
+            case ServiceRequestStatus.PAYMENT_PENDING: return 'Payment Pending';
             case ServiceRequestStatus.COMPLETED: return 'Completed';
             case ServiceRequestStatus.CANCELLED: return 'Cancelled';
             default: return status;
@@ -251,7 +360,6 @@ const ServiceDetailScreen = () => {
                 serviceRequestId: id,
                 currentAgentId: serviceRequest?.assignedToId,
                 currentAgentName: serviceRequest?.assignedToName,
-                orderId: serviceRequest?.orderId,
                 onAgentAssigned: (agent: { id: string; name: string; phone: string }) => {
                     if (serviceRequest) {
                         setServiceRequest({
@@ -282,6 +390,39 @@ const ServiceDetailScreen = () => {
         });
     };
 
+    const createPaymentLink = async () => {
+        setUpdating(true);
+        try {
+            const result = await apiService.post(`/service-requests/${id}/generate-payment-link`);
+            if (result.success) {
+                Alert.alert('Success', 'Payment link created successfully');
+                fetchServiceRequest(); // Refresh to get updated payment info
+            } else {
+                throw new Error(result.error || 'Failed to create payment link');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to create payment link');
+        }
+        setUpdating(false);
+    };
+
+    const verifyPaymentStatus = async () => {
+        setUpdating(true);
+        try {
+            const result = await apiService.post(`/service-requests/${id}/refresh-payment-status`);
+            console.log('result payment verification ',result)
+            if (result.success) {
+                Alert.alert('Success', 'Payment status verified');
+                fetchServiceRequest(); // Refresh to get updated payment info
+            } else {
+                throw new Error(result.error || 'Failed to verify payment');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to verify payment status');
+        }
+        setUpdating(false);
+    };
+
     const getAvailableActions = () => {
         if (!serviceRequest) return [];
 
@@ -291,18 +432,32 @@ const ServiceDetailScreen = () => {
             case ServiceRequestStatus.CREATED:
                 return [
                     { key: ServiceRequestStatus.ASSIGNED, label: 'Mark as Assigned', icon: 'person-add' },
-                    { key: ServiceRequestStatus.IN_PROGRESS, label: 'Start Service', icon: 'play' },
+                    { key: ServiceRequestStatus.SCHEDULED, label: 'Schedule Service', icon: 'calendar' },
                     { key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case ServiceRequestStatus.ASSIGNED:
+                return [
+                    { key: ServiceRequestStatus.SCHEDULED, label: 'Schedule Service', icon: 'calendar' },
+                    { key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true },
+                ];
+            case ServiceRequestStatus.SCHEDULED:
                 return [
                     { key: ServiceRequestStatus.IN_PROGRESS, label: 'Start Service', icon: 'play' },
                     { key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case ServiceRequestStatus.IN_PROGRESS:
+                const actions = [];
+                console.log('here 1 ', serviceRequest.requirePayment)
+                if (serviceRequest.requirePayment) {
+                    actions.push({ key: ServiceRequestStatus.PAYMENT_PENDING, label: 'Mark Payment Pending', icon: 'card' });
+                } else {
+                    actions.push({ key: ServiceRequestStatus.COMPLETED, label: 'Complete Service', icon: 'checkmark-circle' });
+                }
+                actions.push({ key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true });
+                return actions;
+            case ServiceRequestStatus.PAYMENT_PENDING:
                 return [
                     { key: ServiceRequestStatus.COMPLETED, label: 'Complete Service', icon: 'checkmark-circle' },
-                    { key: ServiceRequestStatus.ASSIGNED, label: 'Pause Service', icon: 'pause' },
                     { key: ServiceRequestStatus.CANCELLED, label: 'Cancel Request', icon: 'close-circle', destructive: true },
                 ];
             case ServiceRequestStatus.COMPLETED:
@@ -326,16 +481,11 @@ const ServiceDetailScreen = () => {
             return;
         }
 
-        const options = [
-            ...availableActions.map(action => action.label),
-            'Cancel'
-        ];
-
         Alert.alert(
             'Update Status',
             'Choose a new status for this service request',
             [
-                ...availableActions.map((action, index) => ({
+                ...availableActions.map((action) => ({
                     text: action.label,
                     style: action.destructive ? 'destructive' : 'default',
                     onPress: () => updateServiceStatus(action.key)
@@ -361,16 +511,16 @@ const ServiceDetailScreen = () => {
                 <MaterialIcons name="error-outline" size={48} color="#EF4444" />
                 <Text style={styles.errorTitle}>Service Request Not Found</Text>
                 <Text style={styles.errorSubtitle}>The requested service details could not be found.</Text>
-                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                    <Text style={styles.backButtonText}>Go Back</Text>
+                <TouchableOpacity style={styles.goBackButton} onPress={() => router.back()}>
+                    <Text style={styles.goBackButtonText}>Go Back</Text>
                 </TouchableOpacity>
             </View>
         );
     }
 
+    const availableActions = getAvailableActions();
     const statusColors = getStatusColor(serviceRequest.status);
     const priorityColors = getPriorityColor(serviceRequest.priority);
-    const availableActions = getAvailableActions();
 
     return (
         <View style={styles.container}>
@@ -381,10 +531,10 @@ const ServiceDetailScreen = () => {
                 }
             >
                 {/* Header Card */}
-                <View style={styles.headerCard}>
+                <View style={styles.card}>
                     <View style={styles.headerRow}>
                         <View style={styles.headerLeft}>
-                            <View style={styles.serviceTypeIconLarge}>
+                            <View style={styles.iconContainer}>
                                 <Ionicons
                                     name={getServiceTypeIcon(serviceRequest.type) as any}
                                     size={24}
@@ -392,27 +542,27 @@ const ServiceDetailScreen = () => {
                                 />
                             </View>
                             <View style={styles.headerInfo}>
-                                <Text style={styles.requestId}>#{serviceRequest.id.slice(-6).toUpperCase()}</Text>
-                                <Text style={styles.serviceTypeText}>{serviceRequest.type}</Text>
+                                <Text style={styles.serviceId}>#{serviceRequest.id.slice(-6).toUpperCase()}</Text>
+                                <Text style={styles.serviceType}>{serviceRequest.type}</Text>
                             </View>
                         </View>
                         <View style={styles.headerRight}>
                             {serviceRequest.priority && (
-                                <View style={[styles.priorityBadgeLarge, {
-                                    backgroundColor: priorityColors.bg,
-                                    borderColor: priorityColors.border
+                                <View style={[styles.priorityBadge, {
+                                    backgroundColor: priorityColors.backgroundColor,
+                                    borderColor: priorityColors.borderColor
                                 }]}>
-                                    <Text style={[styles.priorityTextLarge, { color: priorityColors.text }]}>
+                                    <Text style={[styles.priorityText, { color: priorityColors.color }]}>
                                         {serviceRequest.priority}
                                     </Text>
                                 </View>
                             )}
-                            <View style={[styles.statusBadgeLarge, {
-                                backgroundColor: statusColors.bg,
-                                borderColor: statusColors.border
+                            <View style={[styles.statusBadge, {
+                                backgroundColor: statusColors.backgroundColor,
+                                borderColor: statusColors.borderColor
                             }]}>
-                                <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
-                                <Text style={[styles.statusTextLarge, { color: statusColors.text }]}>
+                                <View style={[styles.statusDot, { backgroundColor: statusColors.color }]} />
+                                <Text style={[styles.statusText, { color: statusColors.color }]}>
                                     {getStatusDisplayName(serviceRequest.status)}
                                 </Text>
                             </View>
@@ -424,7 +574,7 @@ const ServiceDetailScreen = () => {
                 </View>
 
                 {/* Customer Information */}
-                <View style={styles.sectionCard}>
+                <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Customer Information</Text>
 
                     <View style={styles.customerInfo}>
@@ -434,19 +584,19 @@ const ServiceDetailScreen = () => {
                         </View>
 
                         <View style={styles.contactRow}>
-                            <View style={styles.contactItem}>
+                            <View style={styles.contactInfo}>
                                 <Ionicons name="call" size={16} color="#6B7280" />
                                 <Text style={styles.contactText}>{serviceRequest.customerPhone}</Text>
                             </View>
-                            <View style={styles.contactActions}>
+                            <View style={styles.contactButtons}>
                                 <TouchableOpacity
-                                    style={[styles.contactButton, styles.callButton]}
+                                    style={[styles.contactButton, { backgroundColor: '#10B981' }]}
                                     onPress={() => handleCall(serviceRequest.customerPhone)}
                                 >
                                     <Ionicons name="call" size={16} color="#fff" />
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[styles.contactButton, styles.whatsappButton]}
+                                    style={[styles.contactButton, { backgroundColor: '#25D366' }]}
                                     onPress={() => handleWhatsApp(serviceRequest.customerPhone)}
                                 >
                                     <Ionicons name="logo-whatsapp" size={16} color="#fff" />
@@ -456,12 +606,12 @@ const ServiceDetailScreen = () => {
 
                         {serviceRequest.customerEmail && serviceRequest.customerEmail !== 'N/A' && (
                             <View style={styles.contactRow}>
-                                <View style={styles.contactItem}>
+                                <View style={styles.contactInfo}>
                                     <Ionicons name="mail" size={16} color="#6B7280" />
                                     <Text style={styles.contactText}>{serviceRequest.customerEmail}</Text>
                                 </View>
                                 <TouchableOpacity
-                                    style={[styles.contactButton, styles.emailButton]}
+                                    style={[styles.contactButton, { backgroundColor: '#3B82F6' }]}
                                     onPress={() => handleEmail(serviceRequest.customerEmail!)}
                                 >
                                     <Ionicons name="mail" size={16} color="#fff" />
@@ -470,143 +620,237 @@ const ServiceDetailScreen = () => {
                         )}
 
                         <View style={styles.addressRow}>
-                            <Ionicons name="location" size={16} color="#6B7280" />
+                            <Ionicons name="location" size={16} color="#6B7280" style={styles.addressIcon} />
                             <Text style={styles.addressText}>{serviceRequest.customerAddress}</Text>
-                            <TouchableOpacity
-                                style={[styles.contactButton, styles.directionsButton]}
-                                onPress={() => handleDirections(serviceRequest.customerAddress)}
-                            >
-                                <Ionicons name="navigate" size={16} color="#fff" />
-                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
 
-                {/* Service Agent Card */}
-                <View style={styles.sectionCard}>
-                    <View style={styles.cardHeader}>
-                        <Text style={styles.sectionTitle}>Service Agent</Text>
+                {/* Payment Status (if payment required) */}
+                {serviceRequest.requirePayment && serviceRequest.paymentStatus && (
+                    <View style={styles.card}>
+                        <Text style={styles.sectionTitle}>Payment Information</Text>
+
+                        <View style={styles.paymentInfo}>
+                            <View style={styles.paymentRow}>
+                                <Text style={styles.paymentLabel}>Status</Text>
+                                <Text style={[
+                                    styles.paymentValue,
+                                    serviceRequest.paymentStatus.status === 'PAID' ? styles.paymentPaid :
+                                        serviceRequest.paymentStatus.status === 'FAILED' ? styles.paymentFailed : styles.paymentPending
+                                ]}>
+                                    {serviceRequest.paymentStatus.status}
+                                </Text>
+                            </View>
+
+                            <View style={styles.paymentRow}>
+                                <Text style={styles.paymentLabel}>Amount</Text>
+                                <Text style={styles.paymentAmount}>₹{serviceRequest.paymentStatus.amount.toLocaleString()}</Text>
+                            </View>
+
+                            <View style={styles.paymentRow}>
+                                <Text style={styles.paymentLabel}>Method</Text>
+                                <Text style={styles.paymentAmount}>{serviceRequest.paymentStatus.method}</Text>
+                            </View>
+
+                            {serviceRequest.paymentStatus.paidDate && (
+                                <View style={styles.paymentRow}>
+                                    <Text style={styles.paymentLabel}>Paid Date</Text>
+                                    <Text style={styles.paymentAmount}>{formatDate(serviceRequest.paymentStatus.paidDate)}</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Payment Actions */}
+                        {serviceRequest.status === ServiceRequestStatus.PAYMENT_PENDING && (
+                            <View style={styles.paymentActions}>
+                                {!serviceRequest.paymentStatus.razorpayPaymentLink && (
+                                    <TouchableOpacity
+                                        style={styles.paymentButton}
+                                        onPress={createPaymentLink}
+                                        disabled={updating}
+                                    >
+                                        {updating ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="link" size={16} color="#fff" />
+                                                <Text style={styles.paymentButtonText}>Create Payment Link</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+                                {
+                                    (serviceRequest.paymentStatus.razorpaySubscriptionId && serviceRequest.paymentStatus.razorpayPaymentLink) && (
+                                        <View style={styles.paymentRow}>
+                                            <Text style={styles.paymentLabel}>Payment Link</Text>
+                                            <TouchableOpacity
+                                                onPress={() => Linking.openURL(serviceRequest.paymentStatus.razorpayPaymentLink)}
+                                            >
+                                                <Text style={styles.paymentAmount}>
+                                                    {serviceRequest.paymentStatus.razorpayPaymentLink}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )
+                                }
+
+                                {(serviceRequest.paymentStatus.razorpaySubscriptionId && serviceRequest.paymentStatus.razorpayPaymentLink) && (
+                                    <TouchableOpacity
+                                        style={[styles.paymentButton, { backgroundColor: '#10B981' }]}
+                                        onPress={verifyPaymentStatus}
+                                        disabled={updating}
+                                    >
+                                        {updating ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <>
+                                                <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                                                <Text style={styles.paymentButtonText}>Verify Payment</Text>
+                                            </>
+                                        )}
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
                     </View>
+                )}
+
+                {/* Service Agent Card */}
+                <View style={styles.card}>
+                    <Text style={styles.sectionTitle}>Service Agent</Text>
 
                     {serviceRequest.assignedToName ? (
-                        <View style={styles.agentSection}>
+                        <View style={styles.agentAssigned}>
                             <View style={styles.agentInfo}>
                                 <View style={styles.agentAvatar}>
                                     <Ionicons name="person" size={20} color="#3B82F6" />
                                 </View>
                                 <View style={styles.agentDetails}>
                                     <Text style={styles.agentName}>{serviceRequest.assignedToName}</Text>
-                                    <Text style={styles.agentStatus}>Assigned Agent</Text>
+                                    <Text style={styles.agentLabel}>Assigned Agent</Text>
                                 </View>
                             </View>
 
-                            {
-                                user?.role !== UserRole.SERVICE_AGENT && <View style={styles.agentActions}>
-                                    <TouchableOpacity
-                                        style={styles.agentActionButton}
-                                        onPress={handleAssignAgent}
-                                    >
-                                        <Ionicons name="swap-horizontal" size={16} color="#3B82F6" />
-                                        <Text style={styles.agentActionText}>Reassign</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            }
-                        </View>
-                    ) : (
-                        <TouchableOpacity
-                            style={styles.noAgentSection}
-                            onPress={handleAssignAgent}
-                        >
-                            <View style={styles.noAgentIcon}>
-                                <Ionicons name="person-add" size={24} color="#6B7280" />
-                            </View>
-                            <View style={styles.noAgentContent}>
-                                <Text style={styles.noAgentText}>No Agent Assigned</Text>
-                                <Text style={styles.noAgentSubtext}>Tap to assign a service agent</Text>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Schedule Card */}
-                <View style={styles.sectionCard}>
-                    <View style={styles.cardHeader}>
-                        <Text style={styles.sectionTitle}>Schedule</Text>
-                    </View>
-
-                    {serviceRequest.scheduledDate ? (
-                        <View style={styles.scheduleSection}>
-                            <View style={styles.scheduleInfo}>
-                                <View style={styles.scheduleIcon}>
-                                    <Ionicons name="calendar" size={20} color="#10B981" />
-                                </View>
-                                <View style={styles.scheduleDetails}>
-                                    <Text style={styles.scheduleDate}>{formatDateFull(serviceRequest.scheduledDate)}</Text>
-                                    <Text style={styles.scheduleStatus}>Scheduled</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.scheduleActions}>
+                            {user?.role !== UserRole.SERVICE_AGENT && (
                                 <TouchableOpacity
-                                    style={styles.scheduleActionButton}
-                                    onPress={handleScheduleTime}
+                                    style={styles.reassignButton}
+                                    onPress={handleAssignAgent}
                                 >
-                                    <Ionicons name="create" size={16} color="#10B981" />
-                                    <Text style={styles.scheduleActionText}>Update</Text>
+                                    <Ionicons name="swap-horizontal" size={16} color="#3B82F6" />
+                                    <Text style={styles.reassignText}>Reassign</Text>
                                 </TouchableOpacity>
-                            </View>
+                            )}
                         </View>
                     ) : (
                         <TouchableOpacity
-                            style={styles.noScheduleSection}
+                            style={styles.scheduleButton}
                             onPress={handleScheduleTime}
                         >
-                            <View style={styles.noScheduleIcon}>
-                                <Ionicons name="calendar-outline" size={24} color="#6B7280" />
-                            </View>
-                            <View style={styles.noScheduleContent}>
-                                <Text style={styles.noScheduleText}>Not Scheduled</Text>
-                                <Text style={styles.noScheduleSubtext}>Tap to schedule service time</Text>
+                            <Ionicons name="calendar-outline" size={24} color="#6B7280" />
+                            <View style={styles.scheduleButtonText}>
+                                <Text style={styles.scheduleButtonTitle}>Not Scheduled</Text>
+                                <Text style={styles.scheduleButtonSubtitle}>Tap to schedule service time</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
                         </TouchableOpacity>
                     )}
                 </View>
 
-                {/* Service Details */}
-                <View style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>Service Details</Text>
+                {/* Images Section */}
+                {(serviceRequest.beforeImages.length > 0 || serviceRequest.afterImages.length > 0 || selectedImages.beforeImages.length > 0 || selectedImages.afterImages.length > 0) && (
+                    <View style={styles.card}>
+                        <Text style={styles.sectionTitle}>Service Images</Text>
 
-                    <View style={styles.detailsGrid}>
-                        <View style={styles.detailItem}>
-                            <Text style={styles.detailLabel}>Service Type</Text>
-                            <Text style={styles.detailValue}>{serviceRequest.type}</Text>
-                        </View>
-
-                        <View style={styles.detailItem}>
-                            <Text style={styles.detailLabel}>Franchise Area</Text>
-                            <Text style={styles.detailValue}>{serviceRequest.franchiseAreaName}</Text>
-                        </View>
-
-                        {serviceRequest.estimatedDuration && (
-                            <View style={styles.detailItem}>
-                                <Text style={styles.detailLabel}>Estimated Duration</Text>
-                                <Text style={styles.detailValue}>{serviceRequest.estimatedDuration} minutes</Text>
+                        {/* Before Images */}
+                        {(serviceRequest.beforeImages.length > 0 || selectedImages.beforeImages.length > 0) && (
+                            <View style={styles.imagesSection}>
+                                <Text style={styles.imagesSectionTitle}>Before Images</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
+                                    {serviceRequest.beforeImages.map((image, index) => (
+                                        <Image
+                                            key={index}
+                                            source={{ uri: image }}
+                                            style={styles.serviceImage}
+                                        />
+                                    ))}
+                                    {selectedImages.beforeImages.map((image, index) => (
+                                        <Image
+                                            key={`selected-${index}`}
+                                            source={{ uri: image.uri }}
+                                            style={styles.serviceImage}
+                                        />
+                                    ))}
+                                </ScrollView>
                             </View>
                         )}
 
-                        {serviceRequest.cost && serviceRequest.cost > 0 && (
-                            <View style={styles.detailItem}>
-                                <Text style={styles.detailLabel}>Service Cost</Text>
-                                <Text style={styles.detailValue}>₹{serviceRequest.cost.toLocaleString()}</Text>
+                        {/* After Images */}
+                        {(serviceRequest.afterImages.length > 0 || selectedImages.afterImages.length > 0) && (
+                            <View>
+                                <Text style={styles.imagesSectionTitle}>After Images</Text>
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagesScroll}>
+                                    {serviceRequest.afterImages.map((image, index) => (
+                                        <Image
+                                            key={index}
+                                            source={{ uri: image }}
+                                            style={styles.serviceImage}
+                                        />
+                                    ))}
+                                    {selectedImages.afterImages.map((image, index) => (
+                                        <Image
+                                            key={`selected-${index}`}
+                                            source={{ uri: image.uri }}
+                                            style={styles.serviceImage}
+                                        />
+                                    ))}
+                                </ScrollView>
                             </View>
                         )}
                     </View>
-                </View>
+                )}
+
+                {/* Image Upload Buttons */}
+                {(serviceRequest.status === ServiceRequestStatus.SCHEDULED || serviceRequest.status === ServiceRequestStatus.IN_PROGRESS) && (
+                    <View style={styles.card}>
+                        <Text style={styles.sectionTitle}>Upload Images</Text>
+
+                        <View style={styles.uploadButtonsRow}>
+                            <TouchableOpacity
+                                style={styles.uploadButton}
+                                onPress={() => pickImages('before')}
+                            >
+                                <Ionicons name="camera" size={16} color="#3B82F6" />
+                                <Text style={styles.uploadButtonText}>Before Images</Text>
+                            </TouchableOpacity>
+
+                            {serviceRequest.status === ServiceRequestStatus.IN_PROGRESS && (
+                                <TouchableOpacity
+                                    style={[styles.uploadButton, { backgroundColor: '#ECFDF5' }]}
+                                    onPress={() => pickImages('after')}
+                                >
+                                    <Ionicons name="camera" size={16} color="#10B981" />
+                                    <Text style={[styles.uploadButtonText, { color: '#10B981' }]}>After Images</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {selectedImages.beforeImages.length > 0 && (
+                            <Text style={styles.selectedImagesText}>
+                                {selectedImages.beforeImages.length} before image(s) selected
+                            </Text>
+                        )}
+
+                        {selectedImages.afterImages.length > 0 && (
+                            <Text style={[styles.selectedImagesText, { color: '#10B981' }]}>
+                                {selectedImages.afterImages.length} after image(s) selected
+                            </Text>
+                        )}
+                    </View>
+                )}
 
                 {/* Timeline */}
-                <View style={styles.sectionCard}>
+                <View style={styles.card}>
                     <Text style={styles.sectionTitle}>Timeline</Text>
 
                     <View style={styles.timeline}>
@@ -622,7 +866,7 @@ const ServiceDetailScreen = () => {
 
                         {serviceRequest.scheduledDate && (
                             <View style={styles.timelineItem}>
-                                <View style={styles.timelineIcon}>
+                                <View style={[styles.timelineIcon, { backgroundColor: '#D1FAE5' }]}>
                                     <Ionicons name="calendar" size={16} color="#10B981" />
                                 </View>
                                 <View style={styles.timelineContent}>
@@ -634,7 +878,7 @@ const ServiceDetailScreen = () => {
 
                         {serviceRequest.completedDate && (
                             <View style={styles.timelineItem}>
-                                <View style={styles.timelineIcon}>
+                                <View style={[styles.timelineIcon, { backgroundColor: '#D1FAE5' }]}>
                                     <Ionicons name="checkmark-circle" size={16} color="#059669" />
                                 </View>
                                 <View style={styles.timelineContent}>
@@ -651,31 +895,31 @@ const ServiceDetailScreen = () => {
 
             {/* Action Button */}
             {availableActions.length > 0 && (
-                <TouchableOpacity
-                    style={[styles.actionButton, updating && styles.actionButtonDisabled]}
-                    onPress={showStatusActionSheet}
-                    disabled={updating}
-                >
-                    {updating ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                        <>
-                            <Ionicons name="options" size={20} color="#fff" />
-                            <Text style={styles.actionButtonText}>Update Status</Text>
-                        </>
-                    )}
-                </TouchableOpacity>
+                <View style={styles.actionButtonContainer}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, updating && styles.actionButtonDisabled]}
+                        onPress={showStatusActionSheet}
+                        disabled={updating}
+                    >
+                        {updating ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Ionicons name="options" size={20} color="#fff" />
+                                <Text style={styles.actionButtonText}>Update Status</Text>
+                            </>
+                        )}
+                    </TouchableOpacity>
+                </View>
             )}
         </View>
     );
 };
 
-export default ServiceDetailScreen;
-
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F9FAFB',
     },
     scrollView: {
         flex: 1,
@@ -685,7 +929,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F9FAFB',
     },
     loadingText: {
         marginTop: 16,
@@ -696,7 +940,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F9FAFB',
         paddingHorizontal: 32,
     },
     errorTitle: {
@@ -712,28 +956,36 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         marginBottom: 24,
     },
-    backButton: {
+    goBackButton: {
         backgroundColor: '#3B82F6',
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 8,
     },
-    backButtonText: {
-        color: '#fff',
+    goBackButtonText: {
+        color: '#FFFFFF',
         fontSize: 14,
         fontWeight: '500',
     },
-    headerCard: {
-        backgroundColor: '#fff',
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: '500',
+        color: '#111827',
+    },
+    card: {
+        backgroundColor: '#FFFFFF',
         borderRadius: 16,
         padding: 20,
         marginTop: 16,
         marginBottom: 12,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
+        shadowOffset: {
+            width: 0,
+            height: 1,
+        },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
     },
     headerRow: {
         flexDirection: 'row',
@@ -746,11 +998,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
-    serviceTypeIconLarge: {
+    iconContainer: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#EEF2FF',
+        backgroundColor: '#EFF6FF',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -758,36 +1010,36 @@ const styles = StyleSheet.create({
     headerInfo: {
         flex: 1,
     },
-    requestId: {
+    serviceId: {
         fontSize: 20,
-        fontWeight: '700',
+        fontWeight: 'bold',
         color: '#111827',
     },
-    serviceTypeText: {
+    serviceType: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#8B5CF6',
+        color: '#7C3AED',
         textTransform: 'capitalize',
     },
     headerRight: {
         alignItems: 'flex-end',
         gap: 8,
     },
-    priorityBadgeLarge: {
+    priorityBadge: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 12,
+        borderRadius: 20,
         borderWidth: 1,
     },
-    priorityTextLarge: {
+    priorityText: {
         fontSize: 12,
         fontWeight: '600',
     },
-    statusBadgeLarge: {
+    statusBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 8,
         paddingHorizontal: 12,
+        paddingVertical: 8,
         borderRadius: 20,
         borderWidth: 1,
     },
@@ -797,8 +1049,8 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         marginRight: 6,
     },
-    statusTextLarge: {
-        fontSize: 13,
+    statusText: {
+        fontSize: 12,
         fontWeight: '600',
         textTransform: 'capitalize',
     },
@@ -813,23 +1065,6 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         lineHeight: 20,
     },
-    sectionCard: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 20,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
     sectionTitle: {
         fontSize: 16,
         fontWeight: '600',
@@ -842,7 +1077,6 @@ const styles = StyleSheet.create({
     customerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
     },
     customerName: {
         fontSize: 16,
@@ -855,7 +1089,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
-    contactItem: {
+    contactInfo: {
         flexDirection: 'row',
         alignItems: 'center',
         flex: 1,
@@ -865,7 +1099,7 @@ const styles = StyleSheet.create({
         color: '#6B7280',
         marginLeft: 8,
     },
-    contactActions: {
+    contactButtons: {
         flexDirection: 'row',
         gap: 8,
     },
@@ -876,22 +1110,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    callButton: {
-        backgroundColor: '#10B981',
-    },
-    whatsappButton: {
-        backgroundColor: '#25D366',
-    },
-    emailButton: {
-        backgroundColor: '#3B82F6',
-    },
-    directionsButton: {
-        backgroundColor: '#8B5CF6',
-    },
     addressRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 8,
+    },
+    addressIcon: {
+        marginTop: 2,
     },
     addressText: {
         fontSize: 14,
@@ -899,8 +1124,54 @@ const styles = StyleSheet.create({
         flex: 1,
         lineHeight: 20,
     },
-    // Agent Section Styles
-    agentSection: {
+    paymentInfo: {
+        gap: 12,
+    },
+    paymentRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+    },
+    paymentLabel: {
+        fontSize: 14,
+        color: '#6B7280',
+    },
+    paymentValue: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    paymentPaid: {
+        color: '#059669',
+    },
+    paymentFailed: {
+        color: '#DC2626',
+    },
+    paymentPending: {
+        color: '#D97706',
+    },
+    paymentAmount: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#111827',
+    },
+    paymentActions: {
+        marginTop: 16,
+        gap: 8,
+    },
+    paymentButton: {
+        backgroundColor: '#3B82F6',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    paymentButtonText: {
+        color: '#FFFFFF',
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    agentAssigned: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -914,7 +1185,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#EEF2FF',
+        backgroundColor: '#EFF6FF',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -926,60 +1197,51 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#111827',
-        marginBottom: 2,
     },
-    agentStatus: {
+    agentLabel: {
         fontSize: 12,
-        color: '#10B981',
+        color: '#059669',
         fontWeight: '500',
     },
-    agentActions: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    agentActionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#EEF2FF',
+    reassignButton: {
+        backgroundColor: '#EFF6FF',
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 12,
-        gap: 4,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
-    agentActionText: {
+    reassignText: {
         fontSize: 12,
         fontWeight: '500',
         color: '#3B82F6',
+        marginLeft: 4,
     },
-    noAgentSection: {
+    assignAgentButton: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 16,
         paddingHorizontal: 16,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F9FAFB',
         borderRadius: 12,
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#E5E7EB',
         borderStyle: 'dashed',
     },
-    noAgentIcon: {
-        marginRight: 12,
-    },
-    noAgentContent: {
+    assignAgentText: {
         flex: 1,
+        marginLeft: 12,
     },
-    noAgentText: {
+    assignAgentTitle: {
         fontSize: 14,
         fontWeight: '500',
         color: '#374151',
-        marginBottom: 2,
     },
-    noAgentSubtext: {
+    assignAgentSubtitle: {
         fontSize: 12,
         color: '#6B7280',
     },
-    // Schedule Section Styles
-    scheduleSection: {
+    scheduleAssigned: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -989,7 +1251,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
-    scheduleIcon: {
+    scheduleAvatar: {
         width: 40,
         height: 40,
         borderRadius: 20,
@@ -1001,83 +1263,96 @@ const styles = StyleSheet.create({
     scheduleDetails: {
         flex: 1,
     },
-    scheduleDate: {
+    scheduleName: {
         fontSize: 14,
         fontWeight: '600',
         color: '#111827',
-        marginBottom: 2,
     },
-    scheduleStatus: {
+    scheduleLabel: {
         fontSize: 12,
-        color: '#10B981',
+        color: '#059669',
         fontWeight: '500',
     },
-    scheduleActions: {
-        flexDirection: 'row',
-        gap: 8,
-    },
-    scheduleActionButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    updateScheduleButton: {
         backgroundColor: '#ECFDF5',
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 12,
-        gap: 4,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
-    scheduleActionText: {
+    updateScheduleText: {
         fontSize: 12,
         fontWeight: '500',
         color: '#10B981',
+        marginLeft: 4,
     },
-    noScheduleSection: {
+    scheduleButton: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 16,
         paddingHorizontal: 16,
-        backgroundColor: '#F8FAFC',
+        backgroundColor: '#F9FAFB',
         borderRadius: 12,
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#E5E7EB',
         borderStyle: 'dashed',
     },
-    noScheduleIcon: {
-        marginRight: 12,
-    },
-    noScheduleContent: {
+    scheduleButtonText: {
         flex: 1,
+        marginLeft: 12,
     },
-    noScheduleText: {
+    scheduleButtonTitle: {
         fontSize: 14,
         fontWeight: '500',
         color: '#374151',
-        marginBottom: 2,
     },
-    noScheduleSubtext: {
+    scheduleButtonSubtitle: {
         fontSize: 12,
         color: '#6B7280',
     },
-    detailsGrid: {
-        gap: 16,
+    imagesSection: {
+        marginBottom: 16,
     },
-    detailItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F1F5F9',
-    },
-    detailLabel: {
+    imagesSectionTitle: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#6B7280',
+        color: '#374151',
+        marginBottom: 8,
     },
-    detailValue: {
+    imagesScroll: {
+        flexDirection: 'row',
+    },
+    serviceImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 8,
+        marginRight: 8,
+    },
+    uploadButtonsRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    uploadButton: {
+        flex: 1,
+        backgroundColor: '#EFF6FF',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    uploadButtonText: {
+        color: '#3B82F6',
+        fontWeight: '500',
         fontSize: 14,
-        fontWeight: '600',
-        color: '#111827',
-        textAlign: 'right',
+        marginLeft: 8,
+    },
+    selectedImagesText: {
+        fontSize: 12,
+        color: '#3B82F6',
+        marginTop: 8,
     },
     timeline: {
         gap: 16,
@@ -1091,7 +1366,7 @@ const styles = StyleSheet.create({
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: '#F1F5F9',
+        backgroundColor: '#F3F4F6',
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -1106,34 +1381,40 @@ const styles = StyleSheet.create({
     timelineDate: {
         fontSize: 12,
         color: '#6B7280',
-        marginTop: 2,
     },
     bottomPadding: {
-        height: 100,
+        height: 96,
+    },
+    actionButtonContainer: {
+        paddingHorizontal: 16,
+        paddingBottom: 16,
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#3B82F6',
         paddingVertical: 16,
         paddingHorizontal: 24,
         borderRadius: 12,
-        margin: 16,
-        shadowColor: '#3B82F6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
+        backgroundColor: '#3B82F6',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.1,
         shadowRadius: 8,
-        elevation: 8,
-        gap: 8,
+        elevation: 4,
     },
     actionButtonDisabled: {
         backgroundColor: '#9CA3AF',
-        shadowOpacity: 0.1,
     },
     actionButtonText: {
-        color: '#fff',
+        color: '#FFFFFF',
         fontSize: 16,
-        fontWeight: '600'
+        fontWeight: '600',
+        marginLeft: 8,
     },
 });
+
+export default ServiceDetailScreen;

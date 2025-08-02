@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react"
 import { Alert, StatusBar, Text } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
+import { useAuth, UserRole } from "@/lib/contexts/AuthContext"
 
 interface Franchise {
     id: string
@@ -13,6 +14,8 @@ interface Franchise {
 const AgentFormScreen = () => {
 
     const { id } = useLocalSearchParams();
+    const { user } = useAuth()
+    console.log('user is ', user)
 
     const isNew = id === "new"
     const [initialValues, setInitialValues] = useState({})
@@ -20,13 +23,17 @@ const AgentFormScreen = () => {
     const [franchises, setFranchises] = useState<Franchise[]>([])
 
     useEffect(() => {
-        fetchFranchises()
+        // Only fetch franchises if user is not a franchise owner
+        if (user?.role !== UserRole.FRANCHISE_OWNER) {
+            fetchFranchises()
+        }
+        
         if (!isNew) {
             fetchAgentData()
         } else {
             setLoading(false)
         }
-    }, [id])
+    }, [id, user])
 
     const fetchFranchises = async () => {
         try {
@@ -43,7 +50,7 @@ const AgentFormScreen = () => {
     const fetchAgentData = async () => {
         try {
             const response = await apiService.get(`/agents?id=${id}`)
-
+            console.log('response ',response)
             if (response.success && response.data) {
                 const data = response.data[0]
                 console.log('response in getting agent ', data)
@@ -52,7 +59,6 @@ const AgentFormScreen = () => {
                         agentName: data.name || "",
                         phoneNumber: data.number || "",
                         email: data.email || "",
-
                         alternativePhone: data.alternativePhone || "",
                         franchiseAreaId: data.franchiseId?.toString() || "",
                     },
@@ -73,24 +79,40 @@ const AgentFormScreen = () => {
                 name: values.agent_info.agentName,
                 number: values.agent_info.phoneNumber,
                 email: values.agent_info.email || null,
-
                 alternativeNumber: values.agent_info.alternativePhone || null,
-                franchiseId: values.agent_info.franchiseAreaId || null,
+            }
+
+            // Add franchiseId based on user role
+            if (user?.role === UserRole.FRANCHISE_OWNER && user.franchiseId) {
+                // For franchise owners, automatically use their franchiseId
+                payload.franchiseId = user.franchiseId;
+                console.log('Franchise Owner - Auto-appending franchiseId:', user.franchiseId);
+            } else {
+                // For other roles (admin), use the selected franchiseId
+                payload.franchiseId = values.agent_info.franchiseAreaId || null;
             }
 
             const endpoint = isNew ? "/agents" : `/agents/${id}`
             const method = isNew ? "post" : "patch"
 
-            console.log('came here  ',payload)
+            console.log('came here  ', payload)
             const response = await apiService[method](endpoint, payload)
 
-            console.log('here completed agent request  ',response)
-            if (response.success===false) {
+            console.log('here completed agent request  ', response)
+            if (response.success === false) {
                 throw new Error(response.message || "Failed to save agent")
             }
 
             // Create the new/updated agent data to pass back
-            const franchiseName = franchises.find(f => f.id.toString() === payload.franchiseId)?.name || 'Global Agent';
+            let franchiseName = 'Global Agent';
+            if (user?.role === UserRole.FRANCHISE_OWNER) {
+                // For franchise owners, you might want to get the franchise name from user data
+                // or make a separate API call if needed
+                franchiseName = 'Your Franchise'; // You can replace this with actual franchise name
+            } else {
+                franchiseName = franchises.find(f => f.id.toString() === payload.franchiseId)?.name || 'Global Agent';
+            }
+            
             const newAgentData = {
                 id: response.data?.id || id || Date.now().toString(),
                 name: payload.name,
@@ -138,7 +160,8 @@ const AgentFormScreen = () => {
         value: franchise.id.toString()
     }))
 
-    const formSections: FormSection[] = [
+    // Build form sections based on user role
+    let formSections: FormSection[] = [
         {
             id: "agent_info",
             title: "Agent Details",
@@ -187,7 +210,6 @@ const AgentFormScreen = () => {
                         },
                     },
                 },
-
                 {
                     id: "alternativePhone",
                     type: "text",
@@ -207,20 +229,23 @@ const AgentFormScreen = () => {
                         },
                     },
                 },
-                {
-                    id: "franchiseAreaId",
-                    type: "select",
-                    label: "Franchise Area ",
-                    placeholder: "Select franchise area",
-                    required: true,
-                    options: [
-
-                        ...franchiseOptions
-                    ],
-                },
             ],
         },
     ]
+
+    // Only add franchise selection field for non-franchise owners
+    if (user?.role !== UserRole.FRANCHISE_OWNER) {
+        formSections[0].fields.push({
+            id: "franchiseAreaId",
+            type: "select",
+            label: "Franchise Area",
+            placeholder: "Select franchise area",
+            required: true,
+            options: [
+                ...franchiseOptions
+            ],
+        });
+    } 
 
     if (loading) {
         return (

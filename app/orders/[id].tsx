@@ -6,7 +6,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Dimensions,
-  Image,
   Linking,
   ScrollView,
   StatusBar,
@@ -41,6 +40,16 @@ interface ActionHistory {
   performedBy: string;
   performedByRole: string;
   metadata: string | null;
+}
+
+interface PaymentStatus {
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  amount: number;
+  method?: string;
+  paidDate?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentLink?: string;
+  razorpaySubscriptionId?: string;
 }
 
 interface InstallationRequest {
@@ -81,6 +90,7 @@ interface InstallationRequest {
     name: string | null;
   } | null;
   actionHistory: ActionHistory[];
+  razorpayOrderId?: string;
 }
 
 interface ServiceAgent {
@@ -105,6 +115,8 @@ export const InstallationRequestDetailsScreen = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus | null>(null);
+  const [loadingPayment, setLoadingPayment] = useState(false);
   const { user } = useAuth();
 
   const statusActionSheetRef = useRef<ActionSheetRef>(null);
@@ -119,9 +131,28 @@ export const InstallationRequestDetailsScreen = () => {
       const result = await apiService.get(`/installation-requests/${id}`);
       
       if (result.success && result.data) {
+        console.log('result.data.installationRequest ',result.data.installationRequest)
         setRequest(result.data.installationRequest);
+        
+        // Check if payment status is available
+        if (result.data.paymentStatus) {
+          setPaymentStatus({
+            status: result.data.paymentStatus.status || 'PENDING',
+            amount: result.data.installationRequest.orderType === 'RENTAL' 
+              ? result.data.installationRequest.product.deposit || 0 
+              : result.data.installationRequest.product.buyPrice || 0,
+            method: result.data.paymentStatus.method,
+            paidDate: result.data.paymentStatus.paidDate,
+            razorpayOrderId: result.data.paymentStatus.razorpayOrderId,
+            razorpayPaymentLink: result.data.paymentStatus.razorpayPaymentLink,
+            razorpaySubscriptionId: result.data.paymentStatus.razorpaySubscriptionId
+          });
+        } else {
+          setPaymentStatus(null);
+        }
       } else {
         setRequest(null);
+        setPaymentStatus(null);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to load request details');
@@ -134,7 +165,7 @@ export const InstallationRequestDetailsScreen = () => {
 
     try {
       console.log('Fetching service agents for franchise:', request.franchiseId);
-      const result = await apiService.get(`/agents/franchise/${request.franchiseId}/agents`);
+      const result = await apiService.get(`/agents`);
       console.log('Available service agents:', result);
 
       if (result && Array.isArray(result.data)) {
@@ -210,7 +241,7 @@ export const InstallationRequestDetailsScreen = () => {
         installationRequestId: id,
         assignedToId: agentId,
         scheduledDate: scheduledDateTime ? scheduledDateTime.toISOString() : new Date().toISOString(),
-        description: `${user?.name || 'Admin'} scheduled installation`
+        description: `${user?.profile?.name || 'Admin'} scheduled installation`
       };
 
       const result = await apiService.post('/service-requests/installation', payload);
@@ -245,6 +276,8 @@ export const InstallationRequestDetailsScreen = () => {
   const handleCompleteInstallation = () => {
     router.push(`/orders/${id}/complete`);
   };
+
+
 
   // Get available status transitions based on current status
   const getAvailableStatusTransitions = (currentStatus: InstallationStatus) => {
@@ -360,6 +393,8 @@ export const InstallationRequestDetailsScreen = () => {
     return request.orderType === 'RENTAL' ? request.product?.rentPrice : request.product?.buyPrice;
   };
 
+  console.log('user is installation request is ',user)
+
   const getActionTypeDisplayName = (actionType: string) => {
     switch (actionType) {
       case 'INSTALLATION_REQUEST_SUBMITTED': return 'Request Submitted';
@@ -386,7 +421,7 @@ export const InstallationRequestDetailsScreen = () => {
       <View style={styles.errorContainer}>
         <MaterialIcons name="build" size={48} color="#9CA3AF" />
         <Text style={styles.errorTitle}>Request Not Found</Text>
-        <Text style={styles.errorSubtitle}>The installation request you're looking for doesn't exist</Text>
+        <Text style={styles.errorSubtitle}>The installation request you&apos;re looking for doesn&apos;t exist</Text>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
@@ -509,6 +544,8 @@ export const InstallationRequestDetailsScreen = () => {
                     <Ionicons name="close-circle" size={16} color="#EF4444" />
                     <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Cancel</Text>
                   </TouchableOpacity>
+                 
+                 
                 </>
               )}
 
@@ -594,6 +631,70 @@ export const InstallationRequestDetailsScreen = () => {
             </View>
           </View>
         </View>
+        
+        {/* Payment Status */}
+        {paymentStatus && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Payment Status</Text>
+            <View style={styles.paymentSection}>
+              <View style={[styles.paymentStatusBadge, {
+                backgroundColor: 
+                  paymentStatus.status === 'COMPLETED' ? '#D1FAE5' :
+                  paymentStatus.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+              }]}>
+                <View style={[styles.statusDot, { 
+                  backgroundColor: 
+                    paymentStatus.status === 'COMPLETED' ? '#059669' :
+                    paymentStatus.status === 'PENDING' ? '#D97706' : '#DC2626'
+                }]} />
+                <Text style={[styles.paymentStatusText, {
+                  color: 
+                    paymentStatus.status === 'COMPLETED' ? '#047857' :
+                    paymentStatus.status === 'PENDING' ? '#92400E' : '#B91C1C'
+                }]}>
+                  {paymentStatus.status}
+                </Text>
+              </View>
+              
+              <View style={styles.paymentDetails}>
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Amount:</Text>
+                  <Text style={styles.paymentValue}>{formatCurrency(paymentStatus.amount)}</Text>
+                </View>
+                
+                {paymentStatus.method && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Method:</Text>
+                    <Text style={styles.paymentValue}>{paymentStatus.method}</Text>
+                  </View>
+                )}
+                
+                {paymentStatus.paidDate && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Paid On:</Text>
+                    <Text style={styles.paymentValue}>{formatDate(paymentStatus.paidDate)}</Text>
+                  </View>
+                )}
+                
+                {paymentStatus.razorpayOrderId && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Order ID:</Text>
+                    <Text style={styles.paymentValue}>{paymentStatus.razorpayOrderId}</Text>
+                  </View>
+                )}
+                
+               
+                
+                {paymentStatus.razorpaySubscriptionId && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Subscription ID:</Text>
+                    <Text style={styles.paymentValue}>{paymentStatus.razorpaySubscriptionId}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Franchise Details */}
         <View style={styles.card}>
@@ -811,6 +912,7 @@ export const InstallationRequestDetailsScreen = () => {
               onChange={handleTimeChange}
             />
           )}
+         
 
           {serviceAgents && serviceAgents.map((agent) => (
             <TouchableOpacity
@@ -1030,6 +1132,40 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_500Medium',
     color: '#374151',
     marginLeft: 4,
+  },
+  paymentSection: {
+    gap: 16,
+  },
+  paymentStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  paymentStatusText: {
+    fontSize: 14,
+    fontFamily: 'Outfit_500Medium',
+  },
+  paymentDetails: {
+    gap: 8,
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  paymentLabel: {
+    fontSize: 14,
+    fontFamily: 'Outfit_500Medium',
+    color: '#6B7280',
+  },
+  paymentValue: {
+    fontSize: 14,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#111827',
   },
   card: {
     backgroundColor: '#FFFFFF',
