@@ -58,7 +58,7 @@ interface ServiceRequest {
   scheduledDate: string | null;
   beforeImages: string[];
   afterImages: string[];
-  requiresPayment: boolean;
+  requirePayment: boolean;
   paymentAmount: number | null;
   createdAt: string;
   updatedAt: string;
@@ -102,7 +102,8 @@ export const ServiceRequestDetailsScreen = () => {
     setLoading(true);
     try {
       const result = await apiService.get(`/service-requests/${id}`);
-      
+
+      console.log('result.data.serviceRequest ', result.data.serviceRequest)
       if (result.success && result.data) {
         setRequest(result.data.serviceRequest);
         setBeforeImages(result.data.serviceRequest.beforeImages || []);
@@ -128,7 +129,7 @@ export const ServiceRequestDetailsScreen = () => {
     try {
       const formData = new FormData();
       formData.append('status', newStatus);
-      
+
       if (comment) {
         formData.append('comment', comment);
       }
@@ -145,7 +146,7 @@ export const ServiceRequestDetailsScreen = () => {
           setUpdating(false);
           return;
         }
-        
+
         // Upload before images if any
         beforeImages.forEach((imageUri, index) => {
           if (imageUri.startsWith('file://') || imageUri.startsWith('content://')) {
@@ -159,19 +160,16 @@ export const ServiceRequestDetailsScreen = () => {
       }
 
       if (newStatus === ServiceStatus.PAYMENT_PENDING) {
-        if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
-          Alert.alert('Error', 'Payment amount is required');
-          setUpdating(false);
-          return;
-        }
+
         if (afterImages.length === 0) {
           Alert.alert('Error', 'After images are required to request payment');
           setUpdating(false);
           return;
         }
-        
-        formData.append('paymentAmount', paymentAmount);
-        
+
+
+        console.log('formData ', formData)
+
         // Upload after images
         afterImages.forEach((imageUri, index) => {
           if (imageUri.startsWith('file://') || imageUri.startsWith('content://')) {
@@ -190,7 +188,7 @@ export const ServiceRequestDetailsScreen = () => {
           setUpdating(false);
           return;
         }
-        
+
         // Upload after images
         afterImages.forEach((imageUri, index) => {
           if (imageUri.startsWith('file://') || imageUri.startsWith('content://')) {
@@ -262,7 +260,7 @@ export const ServiceRequestDetailsScreen = () => {
 
       if (!result.canceled && result.assets) {
         const newImages = result.assets.map(asset => asset.uri);
-        
+
         if (type === 'before') {
           setBeforeImages(prev => [...prev, ...newImages]);
         } else {
@@ -297,6 +295,44 @@ export const ServiceRequestDetailsScreen = () => {
     Linking.openURL(`whatsapp://send?phone=${cleanNumber}`);
   };
 
+  const createPaymentLink = async () => {
+    setUpdating(true);
+    try {
+      const result = await apiService.post(`/service-requests/${id}/generate-payment-link`);
+      if (result.success) {
+        Alert.alert('Success', 'Payment link created successfully');
+        await fetchRequestDetails(); // Refresh to get updated payment info
+      } else {
+        throw new Error(result.error || 'Failed to create payment link');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create payment link');
+
+    }
+    setUpdating(false);
+  };
+
+
+
+
+  const verifyPaymentStatus = async () => {
+    setUpdating(true);
+    try {
+      const result = await apiService.post(`/service-requests/${id}/refresh-payment-status`);
+      console.log('result payment verification ', result)
+      if (result.success) {
+        Alert.alert('Success', 'Payment status verified');
+        await fetchRequestDetails(); // Refresh to get updated payment info
+      } else {
+        throw new Error(result.error || 'Failed to verify payment');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to verify payment status');
+
+    }
+    setUpdating(false);
+  };
+
   // Get available status transitions based on current status and user role
   const getAvailableStatusTransitions = (currentStatus: ServiceStatus, userRole: UserRole) => {
     const transitions: ServiceStatus[] = [];
@@ -308,33 +344,33 @@ export const ServiceRequestDetailsScreen = () => {
         }
         transitions.push(ServiceStatus.CANCELLED);
         break;
-        
+
       case ServiceStatus.ASSIGNED:
         transitions.push(ServiceStatus.SCHEDULED, ServiceStatus.CANCELLED);
         break;
-        
+
       case ServiceStatus.SCHEDULED:
         transitions.push(ServiceStatus.IN_PROGRESS, ServiceStatus.CANCELLED);
         break;
-        
+
       case ServiceStatus.IN_PROGRESS:
         transitions.push(ServiceStatus.COMPLETED);
-        if (request?.requiresPayment) {
+        if (request?.requirePayment) {
           transitions.push(ServiceStatus.PAYMENT_PENDING);
         }
         transitions.push(ServiceStatus.CANCELLED);
         break;
-        
+
       case ServiceStatus.PAYMENT_PENDING:
         transitions.push(ServiceStatus.COMPLETED, ServiceStatus.CANCELLED);
         break;
-        
+
       case ServiceStatus.CANCELLED:
         if (userRole === UserRole.ADMIN || userRole === UserRole.FRANCHISE_OWNER) {
           transitions.push(ServiceStatus.ASSIGNED, ServiceStatus.SCHEDULED);
         }
         break;
-        
+
       default:
         break;
     }
@@ -444,10 +480,10 @@ export const ServiceRequestDetailsScreen = () => {
             <View style={styles.requestInfo}>
               <View style={styles.serviceTypeContainer}>
                 <View style={[styles.serviceTypeIcon, { backgroundColor: serviceTypeColor + '20' }]}>
-                  <Ionicons 
-                    name={getServiceTypeIcon(request.type) as any} 
-                    size={20} 
-                    color={serviceTypeColor} 
+                  <Ionicons
+                    name={getServiceTypeIcon(request.type) as any}
+                    size={20}
+                    color={serviceTypeColor}
                   />
                 </View>
                 <View>
@@ -508,7 +544,7 @@ export const ServiceRequestDetailsScreen = () => {
 
             {request.status === ServiceStatus.IN_PROGRESS && (
               <>
-                {request.requiresPayment ? (
+                {request.requirePayment ? (
                   <TouchableOpacity
                     style={[styles.actionButton, styles.primaryActionButton]}
                     onPress={() => handleStatusUpdate(ServiceStatus.PAYMENT_PENDING)}
@@ -660,7 +696,7 @@ export const ServiceRequestDetailsScreen = () => {
         )}
 
         {/* Payment Information */}
-        {(request.requiresPayment || request.paymentAmount) && (
+        {(request.requirePayment || request.paymentAmount) && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Payment Information</Text>
             <View style={styles.paymentSection}>
@@ -670,19 +706,19 @@ export const ServiceRequestDetailsScreen = () => {
                   <Text style={styles.paymentValue}>{formatCurrency(request.paymentAmount)}</Text>
                 </View>
               )}
-              
+
               {request.paymentStatus && (
                 <View style={styles.paymentStatusRow}>
                   <Text style={styles.paymentLabel}>Status:</Text>
                   <View style={[styles.paymentStatusBadge, {
-                    backgroundColor: 
+                    backgroundColor:
                       request.paymentStatus.status === 'COMPLETED' ? '#D1FAE5' :
-                      request.paymentStatus.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+                        request.paymentStatus.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
                   }]}>
                     <Text style={[styles.paymentStatusText, {
-                      color: 
+                      color:
                         request.paymentStatus.status === 'COMPLETED' ? '#047857' :
-                        request.paymentStatus.status === 'PENDING' ? '#92400E' : '#B91C1C'
+                          request.paymentStatus.status === 'PENDING' ? '#92400E' : '#B91C1C'
                     }]}>
                       {request.paymentStatus.status}
                     </Text>
@@ -690,26 +726,111 @@ export const ServiceRequestDetailsScreen = () => {
                 </View>
               )}
 
-              {request.status === ServiceStatus.IN_PROGRESS && request.requiresPayment && (
-                <View style={styles.paymentInputSection}>
-                  <Text style={styles.paymentInputLabel}>Payment Amount (₹)</Text>
-                  <TextInput
-                    style={styles.paymentInput}
-                    value={paymentAmount}
-                    onChangeText={setPaymentAmount}
-                    placeholder="Enter payment amount"
-                    keyboardType="numeric"
-                  />
-                </View>
-              )}
+
+
+
+
+
             </View>
           </View>
         )}
 
+
+        {/* Payment Status (if payment required) */}
+        {request.requirePayment && request.paymentStatus && (
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Payment Information</Text>
+
+            <View style={styles.paymentInfo}>
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Status</Text>
+                <Text style={[
+                  styles.paymentValue,
+                  request?.paymentStatus?.status === 'PAID' ? styles.paymentPaid :
+                  request?.paymentStatus?.status === 'FAILED' ? styles.paymentFailed : styles.paymentPending
+                ]}>
+                  {request.paymentStatus.status}
+                </Text>
+              </View>
+
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Amount</Text>
+                <Text style={styles.paymentAmount}>₹{request.paymentStatus.amount.toLocaleString()}</Text>
+              </View>
+
+              <View style={styles.paymentRow}>
+                <Text style={styles.paymentLabel}>Method</Text>
+                <Text style={styles.paymentAmount}>{request.paymentStatus.method}</Text>
+              </View>
+
+              {request.paymentStatus.paidDate && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Paid Date</Text>
+                  <Text style={styles.paymentAmount}>{formatDate(request.paymentStatus.paidDate)}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Payment Actions */}
+            {request.status === ServiceStatus.PAYMENT_PENDING && (
+              <View style={styles.paymentActions}>
+                {!request.paymentStatus.razorpayPaymentLink && (
+                  <TouchableOpacity
+                    style={styles.paymentButton}
+                    onPress={createPaymentLink}
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="link" size={16} color="#fff" />
+                        <Text style={styles.paymentButtonText}>Create Payment Link</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+                {
+                  (request.paymentStatus.razorpaySubscriptionId && request.paymentStatus.razorpayPaymentLink) && (
+                    <View style={styles.paymentRow}>
+                      <Text style={styles.paymentLabel}>Payment Link</Text>
+                      <TouchableOpacity
+                        onPress={() => Linking.openURL(request.paymentStatus.razorpayPaymentLink)}
+                      >
+                        <Text style={styles.paymentAmount}>
+                          {request.paymentStatus.razorpayPaymentLink}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )
+                }
+
+                {(request.paymentStatus.razorpaySubscriptionId && request.paymentStatus.razorpayPaymentLink) && (
+                  <TouchableOpacity
+                    style={[styles.paymentButton, { backgroundColor: '#10B981' }]}
+                    onPress={verifyPaymentStatus}
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                        <Text style={styles.paymentButtonText}>Verify Payment</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+
         {/* Service Images */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Service Images</Text>
-          
+
           {/* Initial Images */}
           {request.images && request.images.length > 0 && (
             <View style={styles.imageSection}>
@@ -745,7 +866,7 @@ export const ServiceRequestDetailsScreen = () => {
                   </TouchableOpacity>
                 )}
               </View>
-              
+
               {beforeImages.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={styles.imageGrid}>
@@ -782,58 +903,58 @@ export const ServiceRequestDetailsScreen = () => {
           )}
 
           {/* After Images */}
-          {(request.status === ServiceStatus.IN_PROGRESS || 
-            request.status === ServiceStatus.PAYMENT_PENDING || 
-            request.status === ServiceStatus.COMPLETED || 
+          {(request.status === ServiceStatus.IN_PROGRESS ||
+            request.status === ServiceStatus.PAYMENT_PENDING ||
+            request.status === ServiceStatus.COMPLETED ||
             afterImages.length > 0) && (
-            <View style={styles.imageSection}>
-              <View style={styles.imageSectionHeader}>
-                <Text style={styles.imageSectionTitle}>After Service</Text>
-                {request.status === ServiceStatus.IN_PROGRESS && (
-                  <TouchableOpacity
-                    style={styles.addImageButton}
-                    onPress={() => pickImages('after')}
-                  >
-                    <Ionicons name="camera" size={16} color="#3B82F6" />
-                    <Text style={styles.addImageText}>Add Photos</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-              
-              {afterImages.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.imageGrid}>
-                    {afterImages.map((imageUri, index) => (
-                      <View key={index} style={styles.imageContainer}>
-                        <TouchableOpacity onPress={() => viewImages(afterImages, index)}>
-                          <Image source={{ uri: imageUri }} style={styles.serviceImage} />
-                        </TouchableOpacity>
-                        {request.status === ServiceStatus.IN_PROGRESS && (
-                          <TouchableOpacity
-                            style={styles.removeImageButton}
-                            onPress={() => removeImage('after', index)}
-                          >
-                            <Ionicons name="close" size={12} color="#FFFFFF" />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              ) : request.status === ServiceStatus.IN_PROGRESS ? (
-                <View style={styles.noImagesContainer}>
-                  <Ionicons name="camera" size={32} color="#9CA3AF" />
-                  <Text style={styles.noImagesText}>After images required to complete service</Text>
-                  <TouchableOpacity
-                    style={styles.addFirstImageButton}
-                    onPress={() => pickImages('after')}
-                  >
-                    <Text style={styles.addFirstImageText}>Add After Photos</Text>
-                  </TouchableOpacity>
+              <View style={styles.imageSection}>
+                <View style={styles.imageSectionHeader}>
+                  <Text style={styles.imageSectionTitle}>After Service</Text>
+                  {request.status === ServiceStatus.IN_PROGRESS && (
+                    <TouchableOpacity
+                      style={styles.addImageButton}
+                      onPress={() => pickImages('after')}
+                    >
+                      <Ionicons name="camera" size={16} color="#3B82F6" />
+                      <Text style={styles.addImageText}>Add Photos</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-              ) : null}
-            </View>
-          )}
+
+                {afterImages.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.imageGrid}>
+                      {afterImages.map((imageUri, index) => (
+                        <View key={index} style={styles.imageContainer}>
+                          <TouchableOpacity onPress={() => viewImages(afterImages, index)}>
+                            <Image source={{ uri: imageUri }} style={styles.serviceImage} />
+                          </TouchableOpacity>
+                          {request.status === ServiceStatus.IN_PROGRESS && (
+                            <TouchableOpacity
+                              style={styles.removeImageButton}
+                              onPress={() => removeImage('after', index)}
+                            >
+                              <Ionicons name="close" size={12} color="#FFFFFF" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                ) : request.status === ServiceStatus.IN_PROGRESS ? (
+                  <View style={styles.noImagesContainer}>
+                    <Ionicons name="camera" size={32} color="#9CA3AF" />
+                    <Text style={styles.noImagesText}>After images required to complete service</Text>
+                    <TouchableOpacity
+                      style={styles.addFirstImageButton}
+                      onPress={() => pickImages('after')}
+                    >
+                      <Text style={styles.addFirstImageText}>Add After Photos</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </View>
+            )}
         </View>
       </ScrollView>
 
@@ -880,7 +1001,7 @@ export const ServiceRequestDetailsScreen = () => {
               <Ionicons name="close" size={24} color="#6B7280" />
             </TouchableOpacity>
           </View>
-          
+
           {selectedImages.length > 0 && (
             <ScrollView
               horizontal
@@ -898,7 +1019,7 @@ export const ServiceRequestDetailsScreen = () => {
               ))}
             </ScrollView>
           )}
-          
+
           <View style={styles.imageNavigation}>
             {selectedImages.map((_, index) => (
               <View
@@ -1445,6 +1566,39 @@ const styles = StyleSheet.create({
   },
   activeImageIndicator: {
     backgroundColor: '#FFFFFF',
+  },
+
+  paymentPaid: {
+    color: '#059669',
+  },
+  paymentFailed: {
+    color: '#DC2626',
+  },
+  paymentPending: {
+    color: '#D97706',
+  },
+  paymentAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  paymentActions: {
+    marginTop: 16,
+    gap: 8,
+  },
+  paymentButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paymentButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
 
