@@ -1,9 +1,10 @@
 import { apiService } from '@/lib/api/api';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useNavigation } from 'expo-router';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import {
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,114 +13,144 @@ import {
   View
 } from 'react-native';
 
-interface Notification {
+interface ServiceRequest {
   id: string;
-  title: string;
-  message: string;
-  type: 'service_request' | 'order_update' | 'system' | 'reminder';
+
+  description: string;
+  type: 'installation' | 'repair' | 'maintenance' | 'inspection';
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  isRead: boolean;
+  status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
   createdAt: string;
-  actionUrl?: string;
-  metadata?: {
-    orderId?: string;
-    serviceRequestId?: string;
-    customerId?: string;
-  };
+  customerName: string;
+  customerAddress: string;
+  customerPhone: string;
+  productType?: string;
+  estimatedDuration?: string;
+  requiredSkills?: string[];
 }
 
-const NotificationsScreen = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+const OpenServiceRequestsScreen = () => {
+  const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const { user } = useAuth();
+  const navigation = useNavigation()
 
-  // Mock data for service agents
-  const mockNotifications: Notification[] = [
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: () => (
+        <Text
+          style={{
+            fontSize: 20,
+            fontFamily: 'Outfit_700Bold',
+            color: '#121516',
+          }}
+        >
+          OPEN REQUESTS
+        </Text>
+      ),
+      headerRight: () => <View style={{
+        paddingRight:16
+      }}><View style={styles.headerBadge}>
+        <Text style={styles.headerBadgeText}>{serviceRequests.length}</Text>
+      </View></View>,
+      headerTitleAlign: 'center',
+      headerShadowVisible: false
+    });
+  }, [navigation]);
+
+  // Mock data for open service requests
+  const mockServiceRequests: ServiceRequest[] = [
     {
-      id: 'notif-1',
-      title: 'New Service Request Assigned',
-      message: 'You have been assigned a new water purifier installation at Hyderabad Central.',
-      type: 'service_request',
+      id: 'sr-001',
+    
+      description: 'Install new RO water purifier system in kitchen area. Customer has already purchased the unit.',
+      type: 'installation',
       priority: 'high',
-      isRead: false,
+      status: 'open',
       createdAt: '2024-06-28T09:30:00Z',
-      actionUrl: '/services/sr-1',
-      metadata: {
-        serviceRequestId: 'sr-1',
-        customerId: 'cust-1',
-      },
+      customerName: 'Ravi Kumar',
+      customerAddress: 'Flat 204, Silver Heights, Banjara Hills, Hyderabad - 500034',
+      customerPhone: '+91 98765 43210',
+
     },
     {
-      id: 'notif-2',
-      title: 'Order Status Update',
-      message: 'Order #ORD123 has been confirmed and is ready for delivery.',
-      type: 'order_update',
-      priority: 'medium',
-      isRead: false,
-      createdAt: '2024-06-28T08:15:00Z',
-      actionUrl: '/orders/order-1',
-      metadata: {
-        orderId: 'order-1',
-      },
-    },
-    {
-      id: 'notif-3',
-      title: 'Maintenance Reminder',
-      message: 'Customer Ravi Teja has a scheduled maintenance due today at 2:00 PM.',
-      type: 'reminder',
-      priority: 'medium',
-      isRead: true,
-      createdAt: '2024-06-28T07:00:00Z',
-      actionUrl: '/services/sr-2',
-      metadata: {
-        serviceRequestId: 'sr-2',
-        customerId: 'cust-1',
-      },
-    },
-    {
-      id: 'notif-4',
-      title: 'System Update',
-      message: 'The mobile app has been updated with new features. Please restart the app.',
-      type: 'system',
-      priority: 'low',
-      isRead: true,
-      createdAt: '2024-06-27T18:30:00Z',
-    },
-    {
-      id: 'notif-5',
-      title: 'Urgent Service Request',
-      message: 'Emergency repair needed at Mumbai West. Customer reports complete system failure.',
-      type: 'service_request',
+      id: 'sr-002',
+      
+      description: 'Split AC not cooling properly. Customer reports that it runs but no cold air. Possible refrigerant leak.',
+      type: 'repair',
       priority: 'urgent',
-      isRead: false,
-      createdAt: '2024-06-27T16:45:00Z',
-      actionUrl: '/services/sr-3',
-      metadata: {
-        serviceRequestId: 'sr-3',
-        customerId: 'cust-2',
-      },
+      status: 'open',
+      createdAt: '2024-06-28T08:15:00Z',
+      customerName: 'Priya Sharma',
+      customerAddress: 'House 15, Green Valley Colony, Kondapur, Hyderabad - 500084',
+      customerPhone: '+91 87654 32109',
+
+
+    },
+    {
+      id: 'sr-003',
+     
+      description: 'Regular maintenance service for front-load washing machine. Check drum, filters, and perform cleaning cycle.',
+      type: 'maintenance',
+      priority: 'medium',
+      status: 'open',
+      createdAt: '2024-06-28T07:45:00Z',
+      customerName: 'Amit Patel',
+      customerAddress: 'Villa 42, Palm Meadows, Whitefield, Bangalore - 560066',
+      customerPhone: '+91 76543 21098',
+
+
+    },
+    {
+      id: 'sr-004',
+    
+      description: 'Double door refrigerator completely stopped working. No power, compressor not running.',
+      type: 'repair',
+      priority: 'urgent',
+      status: 'open',
+      createdAt: '2024-06-27T16:30:00Z',
+      customerName: 'Sunita Reddy',
+      customerAddress: 'Apt 301, Cyber Towers, HITEC City, Hyderabad - 500081',
+      customerPhone: '+91 65432 10987',
+
+    },
+    {
+      id: 'sr-005',
+   
+      description: 'Annual safety inspection for commercial microwave oven. Check radiation levels and door seals.',
+      type: 'inspection',
+      priority: 'low',
+      status: 'open',
+      createdAt: '2024-06-27T14:20:00Z',
+      customerName: 'Green Cafe Restaurant',
+      customerAddress: 'Shop 12, Food Court, Forum Mall, Kukatpally, Hyderabad - 500072',
+      customerPhone: '+91 54321 09876',
+
+
     },
   ];
 
   useEffect(() => {
-    fetchNotifications();
+    fetchServiceRequests();
   }, []);
 
-  const fetchNotifications = async () => {
+  const fetchServiceRequests = async () => {
     setLoading(true);
     try {
-      // For now, use mock data since this is primarily for service agents
+      // For now, use mock data
       if (user?.role === UserRole.SERVICE_AGENT) {
-        setNotifications(mockNotifications);
+        // Filter only open requests
+        const openRequests = mockServiceRequests.filter(sr => sr.status === 'open');
+        setServiceRequests(openRequests);
       } else {
-        // For other roles, you might want to fetch different notifications
-        const result = await apiService.get('/notifications');
-        setNotifications(result?.data || []);
+        const result = await apiService.get('/service-requests?status=open');
+        setServiceRequests(result?.data || []);
       }
     } catch (error) {
-      console.log('Failed to fetch notifications:', error);
-      setNotifications(mockNotifications); // Fallback to mock data
+      console.log('Failed to fetch service requests:', error);
+      setServiceRequests(mockServiceRequests.filter(sr => sr.status === 'open'));
     }
     setLoading(false);
     setRefreshing(false);
@@ -127,65 +158,86 @@ const NotificationsScreen = () => {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchNotifications();
+    fetchServiceRequests();
   };
 
-  const markAsRead = async (notificationId: string) => {
+  const handleAssignRequest = (serviceRequest: ServiceRequest) => {
+    Alert.alert(
+      'Assign Service Request',
+      `Would you like to assign "${serviceRequest.type}" to yourself?\n\nCustomer: ${serviceRequest.customerName}\nLocation: ${serviceRequest.customerAddress}\nEstimated Duration: ${serviceRequest.estimatedDuration}`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Assign to Me',
+          style: 'default',
+          onPress: () => assignServiceRequest(serviceRequest.id),
+        },
+      ]
+    );
+  };
+
+  const assignServiceRequest = async (serviceRequestId: string) => {
+    setAssigningId(serviceRequestId);
     try {
-      await apiService.patch(`/notifications/${notificationId}/read`);
-      setNotifications(prev =>
-        prev.map(notif =>
-          notif.id === notificationId ? { ...notif, isRead: true } : notif
-        )
+      // Make API call to assign the service request
+      await apiService.patch(`/service-requests/${serviceRequestId}/assign`, {
+        technicianId: user?.id,
+      });
+
+      // Remove from the list since it's no longer open
+      setServiceRequests(prev => prev.filter(sr => sr.id !== serviceRequestId));
+
+      Alert.alert(
+        'Success',
+        'Service request has been assigned to you successfully!',
+        [
+          {
+            text: 'View Details',
+            onPress: () => router.push(`/servicerequestdetails/${serviceRequestId}` as any),
+          },
+        ]
       );
     } catch (error) {
-      console.log('Failed to mark notification as read:', error);
-      // Update locally anyway for better UX
-      setNotifications(prev =>
-        prev.map(notif =>
-          notif.id === notificationId ? { ...notif, isRead: true } : notif
-        )
+      console.log('Failed to assign service request:', error);
+      Alert.alert(
+        'Error',
+        'Failed to assign the service request. Please try again.',
+        [{ text: 'OK' }]
       );
     }
+    setAssigningId(null);
   };
 
-  const markAllAsRead = async () => {
-    try {
-      await apiService.patch('/notifications/mark-all-read');
-      setNotifications(prev =>
-        prev.map(notif => ({ ...notif, isRead: true }))
-      );
-    } catch (error) {
-      console.log('Failed to mark all notifications as read:', error);
-      // Update locally anyway
-      setNotifications(prev =>
-        prev.map(notif => ({ ...notif, isRead: true }))
-      );
-    }
-  };
-
-  const handleNotificationPress = (notification: Notification) => {
-    if (!notification.isRead) {
-      markAsRead(notification.id);
-    }
-
-    if (notification.actionUrl) {
-      router.push(notification.actionUrl as any);
-    }
-  };
-
-  const getNotificationIcon = (type: string) => {
+  const getServiceTypeIcon = (type: string) => {
     switch (type) {
-      case 'service_request':
+      case 'installation':
         return 'build';
-      case 'order_update':
-        return 'shopping-cart';
-      case 'system':
-        return 'info';
-      case 'reminder':
-        return 'schedule';
+      case 'repair':
+        return 'build';
+      case 'maintenance':
+        return 'settings';
+      case 'inspection':
+        return 'search';
       default:
-        return 'notifications';
+        return 'build';
+    }
+  };
+
+  const getServiceTypeColor = (type: string) => {
+    switch (type) {
+      case 'installation':
+        return { bg: '#EEF2FF', icon: '#3B82F6', text: '#1E40AF' };
+      case 'repair':
+        return { bg: '#FEF2F2', icon: '#EF4444', text: '#DC2626' };
+      case 'maintenance':
+        return { bg: '#F0FDF4', icon: '#10B981', text: '#059669' };
+      case 'inspection':
+        return { bg: '#FEF3C7', icon: '#F59E0B', text: '#D97706' };
+      default:
+        return { bg: '#F9FAFB', icon: '#6B7280', text: '#4B5563' };
     }
   };
 
@@ -224,37 +276,18 @@ const NotificationsScreen = () => {
     }
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading notifications...</Text>
+        <MaterialIcons name="build" size={48} color="#9CA3AF" />
+        <Text style={styles.loadingText}>Loading open service requests...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        {unreadCount > 0 && (
-          <TouchableOpacity style={styles.markAllButton} onPress={markAllAsRead}>
-            <Text style={styles.markAllText}>Mark all read</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Unread Count */}
-      {unreadCount > 0 && (
-        <View style={styles.unreadBanner}>
-          <Ionicons name="notifications" size={16} color="#3B82F6" />
-          <Text style={styles.unreadText}>
-            You have {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
-          </Text>
-        </View>
-      )}
 
       <ScrollView
         style={styles.scrollView}
@@ -263,94 +296,127 @@ const NotificationsScreen = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {notifications.length === 0 ? (
+        {serviceRequests.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialIcons name="notifications-none" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyTitle}>No Notifications</Text>
+            <MaterialIcons name="assignment-turned-in" size={64} color="#9CA3AF" />
+            <Text style={styles.emptyTitle}>No Open Requests</Text>
             <Text style={styles.emptySubtitle}>
-              You're all caught up! New notifications will appear here.
+              All service requests have been assigned. Check back later for new requests.
             </Text>
           </View>
         ) : (
-          notifications.map((notification) => {
-            const priorityColors = getPriorityColor(notification.priority);
-            
+          serviceRequests.map((request) => {
+            const typeColors = getServiceTypeColor(request.type);
+            const priorityColors = getPriorityColor(request.priority);
+            const isAssigning = assigningId === request.id;
+
             return (
-              <TouchableOpacity
-                key={notification.id}
-                style={[
-                  styles.notificationCard,
-                  !notification.isRead && styles.unreadCard,
-                ]}
-                onPress={() => handleNotificationPress(notification)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.notificationHeader}>
-                  <View style={styles.notificationIcon}>
+              <View key={request.id} style={styles.requestCard}>
+                <View style={styles.requestHeader}>
+                  <View style={[styles.typeIcon, { backgroundColor: typeColors.bg }]}>
                     <MaterialIcons
-                      name={getNotificationIcon(notification.type) as any}
+                      name={getServiceTypeIcon(request.type) as any}
                       size={20}
-                      color="#3B82F6"
+                      color={typeColors.icon}
                     />
                   </View>
-                  
-                  <View style={styles.notificationContent}>
-                    <View style={styles.titleRow}>
-                      <Text style={[
-                        styles.notificationTitle,
-                        !notification.isRead && styles.unreadTitle
-                      ]}>
-                        {notification.title}
-                      </Text>
-                      {!notification.isRead && (
-                        <View style={styles.unreadDot} />
-                      )}
-                    </View>
-                    
-                    <Text style={styles.notificationMessage}>
-                      {notification.message}
-                    </Text>
-                    
-                    <View style={styles.notificationFooter}>
-                      <Text style={styles.notificationTime}>
-                        {formatDate(notification.createdAt)}
-                      </Text>
-                      
-                      <View style={[
-                        styles.priorityBadge,
-                        { 
-                          backgroundColor: priorityColors.bg,
-                          borderColor: priorityColors.border 
-                        }
-                      ]}>
-                        <Text style={[
-                          styles.priorityText,
-                          { color: priorityColors.text }
-                        ]}>
-                          {notification.priority.toUpperCase()}
-                        </Text>
-                      </View>
-                    </View>
+
+                  <View style={styles.requestInfo}>
+                    <Text style={styles.requestTitle}>{request.type.toUpperCase()}</Text>
+                   
                   </View>
-                  
-                  {notification.actionUrl && (
-                    <View style={styles.actionIndicator}>
-                      <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+
+                  <View style={[
+                    styles.priorityBadge,
+                    {
+                      backgroundColor: priorityColors.bg,
+                      borderColor: priorityColors.border
+                    }
+                  ]}>
+                    <Text style={[
+                      styles.priorityText,
+                      { color: priorityColors.text }
+                    ]}>
+                      {request.priority.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.requestDescription}>{request.description}</Text>
+
+                <View style={styles.customerInfo}>
+                  <View style={styles.infoRow}>
+                    <MaterialIcons name="person" size={16} color="#6B7280" />
+                    <Text style={styles.infoText}>{request.customerName}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <MaterialIcons name="location-on" size={16} color="#6B7280" />
+                    <Text style={styles.infoText} numberOfLines={1}>
+                      {request.customerAddress}
+                    </Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <MaterialIcons name="phone" size={16} color="#6B7280" />
+                    <Text style={styles.infoText}>{request.customerPhone}</Text>
+                  </View>
+                </View>
+
+                {request.productType && (
+                  <View style={styles.productInfo}>
+                    <MaterialIcons name="devices" size={16} color="#6B7280" />
+                    <Text style={styles.productText}>{request.productType}</Text>
+                  </View>
+                )}
+
+                <View style={styles.requestFooter}>
+                  <View style={styles.timeInfo}>
+                    <MaterialIcons name="schedule" size={14} color="#9CA3AF" />
+                    <Text style={styles.timeText}>
+                      Created {formatDate(request.createdAt)}
+                    </Text>
+                  </View>
+
+                  {request.estimatedDuration && (
+                    <View style={styles.durationInfo}>
+                      <MaterialIcons name="timer" size={14} color="#9CA3AF" />
+                      <Text style={styles.durationText}>
+                        Est: {request.estimatedDuration}
+                      </Text>
                     </View>
                   )}
                 </View>
-              </TouchableOpacity>
+
+
+                <TouchableOpacity
+                  style={[
+                    styles.assignButton,
+                    isAssigning && styles.assigningButton
+                  ]}
+                  onPress={() => handleAssignRequest(request)}
+                  disabled={isAssigning}
+                  activeOpacity={0.8}
+                >
+                  {isAssigning ? (
+                    <Text style={styles.assigningText}>Assigning...</Text>
+                  ) : (
+                    <>
+                      <MaterialIcons name="assignment-ind" size={18} color="#FFFFFF" />
+                      <Text style={styles.assignText}>Assign to Me</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             );
           })
         )}
-        
+
         <View style={styles.bottomPadding} />
       </ScrollView>
     </View>
   );
 };
 
-export default NotificationsScreen;
+export default OpenServiceRequestsScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -367,6 +433,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6B7280',
     fontFamily: 'Outfit_500Medium',
+    marginTop: 16,
   },
   header: {
     flexDirection: 'row',
@@ -383,31 +450,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_700Bold',
     color: '#111827',
   },
-  markAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#EEF2FF',
+  headerBadge: {
+    backgroundColor: '#3B82F6',
     borderRadius: 12,
-  },
-  markAllText: {
-    fontSize: 12,
-    fontFamily: 'Outfit_500Medium',
-    color: '#3B82F6',
-  },
-  unreadBanner: {
-    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 24,
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
-  unreadText: {
-    fontSize: 14,
-    fontFamily: 'Outfit_500Medium',
-    color: '#3B82F6',
-    marginLeft: 8,
+  headerBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -432,82 +486,49 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  notificationCard: {
+  requestCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 16,
     marginTop: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
-  unreadCard: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
-    backgroundColor: '#FEFEFE',
-  },
-  notificationHeader: {
+  requestHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  notificationIcon: {
+  typeIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  notificationContent: {
+  requestInfo: {
     flex: 1,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  notificationTitle: {
+  requestTitle: {
     fontSize: 16,
-    fontFamily: 'Outfit_500Medium',
-    color: '#374151',
-    flex: 1,
-  },
-  unreadTitle: {
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
+    marginBottom: 2,
   },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#3B82F6',
-    marginLeft: 8,
-  },
-  notificationMessage: {
-    fontSize: 14,
-    fontFamily: 'Outfit_400Regular',
-    color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  notificationFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  notificationTime: {
+  requestType: {
     fontSize: 12,
-    fontFamily: 'Outfit_400Regular',
-    color: '#9CA3AF',
+    fontFamily: 'Outfit_500Medium',
+    color: '#6B7280',
   },
   priorityBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -515,9 +536,115 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: 'Outfit_600SemiBold',
   },
-  actionIndicator: {
+  requestDescription: {
+    fontSize: 14,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  customerInfo: {
+    marginBottom: 12,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  infoText: {
+    fontSize: 13,
+    fontFamily: 'Outfit_400Regular',
+    color: '#4B5563',
     marginLeft: 8,
-    paddingLeft: 8,
+    flex: 1,
+  },
+  productInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  productText: {
+    fontSize: 13,
+    fontFamily: 'Outfit_500Medium',
+    color: '#374151',
+    marginLeft: 8,
+  },
+  requestFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  timeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeText: {
+    fontSize: 11,
+    fontFamily: 'Outfit_400Regular',
+    color: '#9CA3AF',
+    marginLeft: 4,
+  },
+  durationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  durationText: {
+    fontSize: 11,
+    fontFamily: 'Outfit_500Medium',
+    color: '#6B7280',
+    marginLeft: 4,
+  },
+  skillsContainer: {
+    marginBottom: 16,
+  },
+  skillsLabel: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: '#4B5563',
+    marginBottom: 6,
+  },
+  skillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  skillBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 6,
+    marginBottom: 4,
+  },
+  skillText: {
+    fontSize: 10,
+    fontFamily: 'Outfit_500Medium',
+    color: '#6B7280',
+  },
+  assignButton: {
+    backgroundColor: '#3B82F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  assigningButton: {
+    backgroundColor: '#9CA3AF',
+  },
+  assignText: {
+    fontSize: 14,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#FFFFFF',
+    marginLeft: 6,
+  },
+  assigningText: {
+    fontSize: 14,
+    fontFamily: 'Outfit_500Medium',
+    color: '#FFFFFF',
   },
   bottomPadding: {
     height: 20,
