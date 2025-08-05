@@ -122,7 +122,7 @@ export default function DashboardScreen() {
 
       const result = await apiService.get(`/dashboard/stats?${params}`);
 
-      console.log('result here is ', result)
+   
 
       if (result.success) {
         setDashboardData(result.data);
@@ -132,7 +132,7 @@ export default function DashboardScreen() {
       }
       setDashboardData(getMockDashboardData());
     } catch (error) {
-      console.log('Failed to fetch dashboard data:', error);
+     
       // Fallback to mock data
       setDashboardData(getMockDashboardData());
     } finally {

@@ -193,8 +193,10 @@ export const InstallationRequestDetailsScreen = () => {
         ...(comment && { comment }),
         ...additionalData
       };
+      console.log('payload ',payload)
 
       const result = await apiService.patch(`/installation-requests/${id}/status`, payload);
+      console.log('status update ',result)
 
       await fetchRequestDetails();
       statusActionSheetRef.current?.hide();

@@ -45,13 +45,13 @@ const Login = () => {
                 `/auth/checkrole?phoneNumber=${phoneNumber}&role=${selectedRole}`
             );
 
-            console.log('Role check result:', result);
+
 
             if (result.success) {
                 if (result.data.exists && result.data.role === selectedRole) {
                     // User exists with correct role, proceed with OTP
                     const confirmation = await sendOTP(phoneNumber, selectedRole as CustomerType);
-                    console.log('OTP sent successfully:', confirmation);
+     
                     navigation.navigate('otp' as never, { 
                         role: selectedRole,
                         phoneNumber: phoneNumber,
@@ -74,7 +74,7 @@ const Login = () => {
                 Alert.alert('Error', result.error || 'Failed to verify user. Please try again.');
             }
         } catch (error) {
-            console.log('Failed to send OTP:', error);
+       
             Alert.alert('Error', 'Failed to send OTP. Please check your connection and try again.');
         } finally {
             setIsLoading(false);

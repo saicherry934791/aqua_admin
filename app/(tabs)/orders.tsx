@@ -74,7 +74,7 @@ const InstallationRequestsScreen = () => {
       }
 
       const result = await apiService.get('/installation-requests', { params });
-      console.log('Installation Requests API response:', JSON.stringify(result));
+  
 
       if (result.success && result.data && Array.isArray(result.data.installationRequests)) {
         setRequests(result.data.installationRequests);
@@ -82,7 +82,7 @@ const InstallationRequestsScreen = () => {
         setRequests([]);
       }
     } catch (error) {
-      console.log('Failed to fetch installation requests:', error);
+   
       setRequests([]);
     }
     setLoading(false);
@@ -276,7 +276,7 @@ const InstallationRequestsScreen = () => {
                 key={request.id}
                 style={styles.requestCard}
                 onPress={() => {
-                  console.log('clicked request:', request.id);
+               
                   router.push(`/orders/${request.id}`);
                 }}
                 activeOpacity={0.7}

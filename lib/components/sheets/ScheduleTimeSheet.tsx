@@ -65,20 +65,31 @@ export default function ScheduleTimeSheet({
   const handleScheduleService = async () => {
     setUpdating(true);
     try {
-      const result = await apiService.patch(`/service-requests/${serviceRequestId}/schedule`, {
-        scheduledDate: selectedDate.toISOString()
-      });
+      // Use the status update endpoint with SCHEDULED status and scheduledDate
+      const formData = new FormData();
+      formData.append('status', 'SCHEDULED');
+      formData.append('scheduledDate', selectedDate.toISOString());
 
-      if (result.success) {
-        onScheduleUpdated(selectedDate.toISOString());
-        SheetManager.hide(sheetId);
-        Alert.alert(
-          'Success', 
-          `Service has been scheduled for ${formatDateTime(selectedDate)}`
-        );
-      } else {
-        throw new Error(result.error || 'Failed to schedule service');
-      }
+      console.log('formData is ',formData)
+      onScheduleUpdated(selectedDate.toISOString());
+
+      // const result = await apiService.patch(`/service-requests/${serviceRequestId}/status`, formData, {
+      //   headers: {
+      //     'Content-Type': 'multipart/form-data',
+      //   },
+      // });
+
+      // if (result.success) {
+      //   // Call the callback to trigger details refresh
+      //   onScheduleUpdated(selectedDate.toISOString());
+      //   SheetManager.hide(sheetId);
+      //   Alert.alert(
+      //     'Success', 
+      //     `Service has been scheduled for ${formatDateTime(selectedDate)}`
+      //   );
+      // } else {
+      //   throw new Error(result.error || 'Failed to schedule service');
+      // }
     } catch (error: any) {
       console.log('Failed to schedule service:', error);
       Alert.alert('Error', error.message || 'Failed to schedule service');
@@ -99,8 +110,14 @@ export default function ScheduleTimeSheet({
           onPress: async () => {
             setUpdating(true);
             try {
-              const result = await apiService.patch(`/service-requests/${serviceRequestId}/schedule`, {
-                scheduledDate: null
+              // Use the status update endpoint to clear schedule
+              const formData = new FormData();
+              formData.append('scheduledDate', ''); // Clear the scheduled date
+
+              const result = await apiService.patch(`/service-requests/${serviceRequestId}/status`, formData, {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
               });
 
               if (result.success) {
@@ -122,23 +139,6 @@ export default function ScheduleTimeSheet({
     );
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-IN', {
-      weekday: 'long',
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
-    });
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
   const formatDateTime = (date: Date) => {
     return date.toLocaleDateString('en-IN', {
       weekday: 'short',
@@ -151,43 +151,15 @@ export default function ScheduleTimeSheet({
     });
   };
 
-  const getQuickScheduleOptions = () => {
+  const isValidScheduleTime = () => {
     const now = new Date();
-    const options = [];
-
-    // Tomorrow morning
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    options.push({ label: 'Tomorrow Morning (9:00 AM)', date: tomorrow });
-
-    // Tomorrow afternoon
-    const tomorrowAfternoon = new Date(now);
-    tomorrowAfternoon.setDate(now.getDate() + 1);
-    tomorrowAfternoon.setHours(14, 0, 0, 0);
-    options.push({ label: 'Tomorrow Afternoon (2:00 PM)', date: tomorrowAfternoon });
-
-    // Day after tomorrow
-    const dayAfter = new Date(now);
-    dayAfter.setDate(now.getDate() + 2);
-    dayAfter.setHours(10, 0, 0, 0);
-    options.push({ label: 'Day After Tomorrow (10:00 AM)', date: dayAfter });
-
-    // Next week
-    const nextWeek = new Date(now);
-    nextWeek.setDate(now.getDate() + 7);
-    nextWeek.setHours(10, 0, 0, 0);
-    options.push({ label: 'Next Week (10:00 AM)', date: nextWeek });
-
-    return options;
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+    return selectedDate > oneHourFromNow;
   };
-
-  const quickOptions = getQuickScheduleOptions();
 
   return (
     <ActionSheet
       id={sheetId}
-      snapPoints={[100]}
       initialSnapIndex={0}
       gestureEnabled={true}
       closeOnTouchBackdrop={true}
@@ -215,53 +187,56 @@ export default function ScheduleTimeSheet({
           </View>
         )}
 
-        {/* Quick Schedule Options */}
+        {/* Date & Time Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Schedule</Text>
-          <View style={styles.quickOptionsContainer}>
-            {quickOptions.map((option, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.quickOption}
-                onPress={() => setSelectedDate(option.date)}
-                disabled={updating}
-              >
-                <Ionicons name="time" size={20} color="#3B82F6" />
-                <Text style={styles.quickOptionText}>{option.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Custom Date & Time Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Custom Date & Time</Text>
+          <Text style={styles.sectionTitle}>Select Date & Time</Text>
           
-          <View style={styles.dateTimeContainer}>
-            <TouchableOpacity
-              style={styles.dateTimeButton}
-              onPress={() => setShowDatePicker(true)}
-              disabled={updating}
-            >
-              <Ionicons name="calendar" size={20} color="#3B82F6" />
-              <View style={styles.dateTimeInfo}>
-                <Text style={styles.dateTimeLabel}>Date</Text>
-                <Text style={styles.dateTimeValue}>{formatDate(selectedDate)}</Text>
-              </View>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.dateTimeButton}
+            onPress={() => setShowDatePicker(true)}
+            disabled={updating}
+          >
+            <Ionicons name="calendar" size={20} color="#3B82F6" />
+            <View style={styles.dateTimeInfo}>
+              <Text style={styles.dateTimeLabel}>Date</Text>
+              <Text style={styles.dateTimeValue}>
+                {selectedDate.toLocaleDateString('en-IN', {
+                  weekday: 'long',
+                  day: '2-digit',
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.dateTimeButton}
-              onPress={() => setShowTimePicker(true)}
-              disabled={updating}
-            >
-              <Ionicons name="time" size={20} color="#3B82F6" />
-              <View style={styles.dateTimeInfo}>
-                <Text style={styles.dateTimeLabel}>Time</Text>
-                <Text style={styles.dateTimeValue}>{formatTime(selectedDate)}</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.dateTimeButton}
+            onPress={() => setShowTimePicker(true)}
+            disabled={updating}
+          >
+            <Ionicons name="time" size={20} color="#3B82F6" />
+            <View style={styles.dateTimeInfo}>
+              <Text style={styles.dateTimeLabel}>Time</Text>
+              <Text style={styles.dateTimeValue}>
+                {selectedDate.toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Validation Warning */}
+          {!isValidScheduleTime() && (
+            <View style={styles.warningContainer}>
+              <Ionicons name="warning" size={16} color="#F59E0B" />
+              <Text style={styles.warningText}>
+                Schedule time should be at least 1 hour from now
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Selected Schedule Preview */}
@@ -283,7 +258,7 @@ export default function ScheduleTimeSheet({
               ) : (
                 <>
                   <Ionicons name="trash" size={20} color="#EF4444" />
-                  <Text style={styles.clearButtonText}>Clear Schedule</Text>
+                  <Text style={styles.clearButtonText}>Clear</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -293,10 +268,10 @@ export default function ScheduleTimeSheet({
             style={[
               styles.actionButton,
               styles.scheduleButton,
-              updating && styles.disabledButton
+              (updating || !isValidScheduleTime()) && styles.disabledButton
             ]}
             onPress={handleScheduleService}
-            disabled={updating}
+            disabled={updating || !isValidScheduleTime()}
           >
             {updating ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
@@ -338,14 +313,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    minHeight: screenHeight ,
   },
   container: {
-    flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    maxHeight: screenHeight ,
-    minHeight: screenHeight * 0.7,
   },
   header: {
     flexDirection: 'row',
@@ -391,28 +362,6 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
   },
-  quickOptionsContainer: {
-    gap: 8,
-  },
-  quickOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    gap: 12,
-  },
-  quickOptionText: {
-    fontSize: 14,
-    fontFamily: 'Outfit_500Medium',
-    color: '#374151',
-    flex: 1,
-  },
-  dateTimeContainer: {
-    gap: 12,
-  },
   dateTimeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -422,6 +371,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     gap: 12,
+    marginBottom: 12,
   },
   dateTimeInfo: {
     flex: 1,
@@ -436,6 +386,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Outfit_600SemiBold',
     color: '#111827',
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    gap: 8,
+    marginTop: 8,
+  },
+  warningText: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: '#92400E',
+    flex: 1,
   },
   previewContainer: {
     backgroundColor: '#EEF2FF',

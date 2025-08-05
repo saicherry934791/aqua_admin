@@ -107,7 +107,7 @@ const OTPScreen = () => {
                         try {
                             await router.replace('/(tabs)');
                         } catch (navError) {
-                            console.log('Navigation error after OTP:', navError);
+                         
                             // Force navigation as fallback
                             router.push('/(tabs)');
                         }
@@ -119,7 +119,7 @@ const OTPScreen = () => {
                     inputRefs.current[0]?.focus();
                 }
             } catch (error: any) {
-                console.log('OTP verification error:', error);
+          
                 Alert.alert('Error', error.message || 'OTP verification failed. Please try again.');
                 // Clear OTP on error
                 setOtp(['', '', '', '', '', '']);

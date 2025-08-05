@@ -4,32 +4,29 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import ActionSheet, { SheetManager, SheetProps } from 'react-native-actions-sheet';
 
-const { height: screenHeight } = Dimensions.get('window');
-
-interface ServiceAgent {
+interface Agent {
   id: string;
   name: string;
   phone: string;
-  email?: string;
-  isAvailable?: boolean;
-  currentAssignments?: number;
+  email: string;
+  isAvailable: boolean;
+  activeServiceRequests: number;
 }
 
 interface AgentAssignmentSheetProps extends SheetProps {
   serviceRequestId: string;
   currentAgentId?: string;
   currentAgentName?: string;
-  orderId:string;
-  onAgentAssigned: (agent: ServiceAgent) => void;
+  onAgentAssigned: (agent: Agent) => void;
 }
 
 export default function AgentAssignmentSheet({ 
@@ -39,70 +36,79 @@ export default function AgentAssignmentSheet({
   const { 
     serviceRequestId, 
     currentAgentId, 
-    currentAgentName, 
-    onAgentAssigned ,
-    orderId
+    currentAgentName,
+    onAgentAssigned 
   } = payload || {};
 
-  const [agents, setAgents] = useState<ServiceAgent[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [assigning, setAssigning] = useState(false);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(currentAgentId || null);
+  const [assigning, setAssigning] = useState<string | null>(null);
 
   useEffect(() => {
-    if (serviceRequestId) {
-      fetchAvailableAgents();
+    fetchAvailableAgents();
+  }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredAgents(agents);
+    } else {
+      const filtered = agents.filter(agent =>
+        agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        agent.phone.includes(searchQuery) ||
+        agent.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredAgents(filtered);
     }
-  }, [serviceRequestId]);
+  }, [searchQuery, agents]);
 
   const fetchAvailableAgents = async () => {
     setLoading(true);
     try {
-      const result = await apiService.get(`/orders/${orderId}/available-agents`);
-      console.log('Available service agents:', result.data?.availableAgents);
-      
-      if (result.success && result.data?.availableAgents) {
-        setAgents(result.data.availableAgents);
+      const result = await apiService.get('/agents/available');
+      if (result.success && result.data) {
+        setAgents(result.data.agents || []);
+        setFilteredAgents(result.data.agents || []);
       } else {
         setAgents([]);
+        setFilteredAgents([]);
       }
     } catch (error) {
-      console.log('Failed to fetch service agents:', error);
+      console.log('Failed to fetch agents:', error);
       Alert.alert('Error', 'Failed to load available agents');
       setAgents([]);
+      setFilteredAgents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAgentSelection = (agent: ServiceAgent) => {
-    setSelectedAgentId(agent.id);
-  };
-
-  const handleAssignAgent = async () => {
-    if (!selectedAgentId) {
-      Alert.alert('No Selection', 'Please select an agent to assign');
+  const handleAssignAgent = async (agent: Agent) => {
+    if (agent.id === currentAgentId) {
+      Alert.alert('Info', 'This agent is already assigned to this service request');
       return;
     }
 
-    const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
-    if (!selectedAgent) {
-      Alert.alert('Error', 'Selected agent not found');
-      return;
-    }
-
-    setAssigning(true);
+    setAssigning(agent.id);
     try {
-      const result = await apiService.patch(`/service-requests/${serviceRequestId}/assign`, {
-        assignedToId: selectedAgentId
+      // Use the status update endpoint with ASSIGNED status and agentId
+      const formData = new FormData();
+      formData.append('status', 'ASSIGNED');
+      formData.append('assignedAgentId', agent.id);
+
+      const result = await apiService.patch(`/service-requests/${serviceRequestId}/status`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
 
       if (result.success) {
-        onAgentAssigned(selectedAgent);
+        onAgentAssigned(agent);
         SheetManager.hide(sheetId);
         Alert.alert(
           'Success', 
-          `Agent ${selectedAgent.name} has been assigned to this service request`
+          `${agent.name} has been assigned to this service request`
         );
       } else {
         throw new Error(result.error || 'Failed to assign agent');
@@ -111,26 +117,34 @@ export default function AgentAssignmentSheet({
       console.log('Failed to assign agent:', error);
       Alert.alert('Error', error.message || 'Failed to assign agent');
     } finally {
-      setAssigning(false);
+      setAssigning(null);
     }
   };
 
   const handleUnassignAgent = async () => {
     Alert.alert(
       'Unassign Agent',
-      'Are you sure you want to unassign the current agent?',
+      `Are you sure you want to unassign ${currentAgentName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Unassign',
           style: 'destructive',
           onPress: async () => {
-            setAssigning(true);
+            setAssigning('unassign');
             try {
-              const result = await apiService.patch(`/service-requests/${serviceRequestId}/unassign-agent`);
-              
+              // Use the status update endpoint to unassign agent
+              const formData = new FormData();
+              formData.append('assignedAgentId', ''); // Clear the assigned agent
+
+              const result = await apiService.patch(`/service-requests/${serviceRequestId}/status`, formData, {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
+              });
+
               if (result.success) {
-                onAgentAssigned({ id: '', name: '', phone: '' }); // Clear assignment
+                onAgentAssigned(null as any); // Trigger refresh
                 SheetManager.hide(sheetId);
                 Alert.alert('Success', 'Agent has been unassigned');
               } else {
@@ -140,7 +154,7 @@ export default function AgentAssignmentSheet({
               console.log('Failed to unassign agent:', error);
               Alert.alert('Error', error.message || 'Failed to unassign agent');
             } finally {
-              setAssigning(false);
+              setAssigning(null);
             }
           }
         }
@@ -148,69 +162,70 @@ export default function AgentAssignmentSheet({
     );
   };
 
-  const renderAgentItem = ({ item }: { item: ServiceAgent }) => {
-    const isSelected = selectedAgentId === item.id;
-    const isCurrent = currentAgentId === item.id;
+  const renderAgentItem = ({ item: agent }: { item: Agent }) => {
+    const isCurrentAgent = agent.id === currentAgentId;
+    const isAssigningThis = assigning === agent.id;
 
     return (
       <TouchableOpacity
         style={[
           styles.agentItem,
-          isSelected && styles.selectedAgentItem,
-          isCurrent && styles.currentAgentItem
+          isCurrentAgent && styles.currentAgentItem,
+          !agent.isAvailable && styles.unavailableAgentItem
         ]}
-        onPress={() => handleAgentSelection(item)}
-        disabled={assigning}
+        onPress={() => handleAssignAgent(agent)}
+        disabled={isAssigningThis || !agent.isAvailable}
       >
         <View style={styles.agentInfo}>
           <View style={styles.agentHeader}>
             <Text style={[
               styles.agentName,
-              isSelected && styles.selectedAgentText
+              isCurrentAgent && styles.currentAgentText,
+              !agent.isAvailable && styles.unavailableText
             ]}>
-              {item.name}
+              {agent.name}
             </Text>
-            {isCurrent && (
+            {isCurrentAgent && (
               <View style={styles.currentBadge}>
                 <Text style={styles.currentBadgeText}>Current</Text>
               </View>
             )}
-            {item.isAvailable === false && (
+            {!agent.isAvailable && (
               <View style={styles.unavailableBadge}>
                 <Text style={styles.unavailableBadgeText}>Busy</Text>
               </View>
             )}
           </View>
           
-          <View style={styles.agentDetails}>
-            <View style={styles.agentDetailRow}>
-              <Ionicons name="call" size={14} color="#6B7280" />
-              <Text style={styles.agentDetailText}>{item.phone}</Text>
-            </View>
-            
-            {item.email && (
-              <View style={styles.agentDetailRow}>
-                <Ionicons name="mail" size={14} color="#6B7280" />
-                <Text style={styles.agentDetailText}>{item.email}</Text>
-              </View>
-            )}
-            
-            {item.currentAssignments !== undefined && (
-              <View style={styles.agentDetailRow}>
-                <Ionicons name="briefcase" size={14} color="#6B7280" />
-                <Text style={styles.agentDetailText}>
-                  {item.currentAssignments} active assignments
-                </Text>
-              </View>
-            )}
-          </View>
+          <Text style={[
+            styles.agentContact,
+            !agent.isAvailable && styles.unavailableText
+          ]}>
+            {agent.phone} • {agent.email}
+          </Text>
+          
+          <Text style={[
+            styles.agentWorkload,
+            !agent.isAvailable && styles.unavailableText
+          ]}>
+            Active requests: {agent.activeServiceRequests}
+          </Text>
         </View>
-        
-        {isSelected && (
-          <View style={styles.checkmark}>
-            <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-          </View>
-        )}
+
+        <View style={styles.agentActions}>
+          {isAssigningThis ? (
+            <ActivityIndicator size="small" color="#3B82F6" />
+          ) : (
+            <Ionicons 
+              name={isCurrentAgent ? "checkmark-circle" : "person-add"} 
+              size={24} 
+              color={
+                isCurrentAgent ? "#10B981" : 
+                !agent.isAvailable ? "#9CA3AF" : "#3B82F6"
+              } 
+            />
+          )}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -218,119 +233,100 @@ export default function AgentAssignmentSheet({
   return (
     <ActionSheet
       id={sheetId}
-      // Fix 1: Use multiple snap points for better control
-      snapPoints={[70, 90]} // 70% and 90% of screen height
       initialSnapIndex={0}
       gestureEnabled={true}
       closeOnTouchBackdrop={true}
-      // Fix 2: Add proper container styling with height constraints
       containerStyle={styles.actionSheetContainer}
-      // Fix 3: Add these additional props for better behavior
-      drawUnderStatusBar={false}
-      statusBarTranslucent={false}
-      defaultOverlayOpacity={0.3}
     >
-      {/* Fix 4: Wrap content in a container with proper height */}
-      <View style={styles.sheetContent}>
-        {/* Header with drag indicator */}
-        <View style={styles.dragIndicator} />
-        
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>
-              {currentAgentId ? 'Reassign Agent' : 'Assign Agent'}
-            </Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => SheetManager.hide(sheetId)}
-            >
-              <Ionicons name="close" size={24} color="#6B7280" />
-            </TouchableOpacity>
-          </View>
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Assign Agent</Text>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => SheetManager.hide(sheetId)}
+          >
+            <Ionicons name="close" size={24} color="#6B7280" />
+          </TouchableOpacity>
+        </View>
 
-          {/* Current Assignment Info */}
-          {currentAgentId && currentAgentName && (
-            <View style={styles.currentAssignmentInfo}>
-              <Text style={styles.currentAssignmentLabel}>Currently Assigned:</Text>
-              <Text style={styles.currentAssignmentName}>{currentAgentName}</Text>
+        {/* Current Agent Info */}
+        {currentAgentId && currentAgentName && (
+          <View style={styles.currentAgentInfo}>
+            <View style={styles.currentAgentHeader}>
+              <Text style={styles.currentAgentLabel}>Currently Assigned:</Text>
+              <TouchableOpacity
+                style={styles.unassignButton}
+                onPress={handleUnassignAgent}
+                disabled={assigning === 'unassign'}
+              >
+                {assigning === 'unassign' ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <>
+                    <Ionicons name="person-remove" size={16} color="#EF4444" />
+                    <Text style={styles.unassignButtonText}>Unassign</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-          )}
+            <Text style={styles.currentAgentName}>{currentAgentName}</Text>
+          </View>
+        )}
 
-          {/* Loading State */}
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#9CA3AF" />
+          <TextInput
+          style={styles.searchInput}
+            placeholder="Search agents by name, phone, or email"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Agents List */}
+        <View style={styles.agentsContainer}>
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#3B82F6" />
               <Text style={styles.loadingText}>Loading available agents...</Text>
             </View>
-          ) : (
-            <>
-              {/* Agents List */}
-              <View style={styles.agentsContainer}>
-                <Text style={styles.sectionTitle}>Available Agents</Text>
-                
-                {agents.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Ionicons name="people" size={48} color="#9CA3AF" />
-                    <Text style={styles.emptyTitle}>No Agents Available</Text>
-                    <Text style={styles.emptySubtitle}>
-                      There are no agents available for assignment at this time
-                    </Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    data={agents}
-                    renderItem={renderAgentItem}
-                    keyExtractor={(item) => item.id}
-                    style={styles.agentsList}
-                    showsVerticalScrollIndicator={false}
-                    // Fix 5: Add max height to prevent overflow
-                    contentContainerStyle={styles.agentsListContent}
-                  />
-                )}
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.actionButtons}>
-                {currentAgentId && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.unassignButton]}
-                    onPress={handleUnassignAgent}
-                    disabled={assigning}
-                  >
-                    {assigning ? (
-                      <ActivityIndicator size="small" color="#EF4444" />
-                    ) : (
-                      <>
-                        <Ionicons name="person-remove" size={20} color="#EF4444" />
-                        <Text style={styles.unassignButtonText}>Unassign Current</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-                
+          ) : filteredAgents.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="people" size={48} color="#9CA3AF" />
+              <Text style={styles.emptyTitle}>
+                {searchQuery ? 'No agents found' : 'No agents available'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {searchQuery 
+                  ? 'Try adjusting your search terms'
+                  : 'All agents are currently busy with other requests'
+                }
+              </Text>
+              {searchQuery && (
                 <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.assignButton,
-                    (!selectedAgentId || assigning) && styles.disabledButton
-                  ]}
-                  onPress={handleAssignAgent}
-                  disabled={!selectedAgentId || assigning}
+                  style={styles.clearSearchButton}
+                  onPress={() => setSearchQuery('')}
                 >
-                  {assigning ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Ionicons name="person-add" size={20} color="#FFFFFF" />
-                      <Text style={styles.assignButtonText}>
-                        {currentAgentId ? 'Reassign Agent' : 'Assign Agent'}
-                      </Text>
-                    </>
-                  )}
+                  <Text style={styles.clearSearchText}>Clear Search</Text>
                 </TouchableOpacity>
-              </View>
-            </>
+              )}
+            </View>
+          ) : (
+            <FlatList
+              data={filteredAgents}
+              renderItem={renderAgentItem}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.agentsList}
+            />
           )}
         </View>
       </View>
@@ -343,35 +339,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    // Fix 6: Ensure minimum height
-    minHeight: screenHeight * 0.7,
-  },
-  // Fix 7: New wrapper for proper height management
-  sheetContent: {
-    flex: 1,
-    maxHeight: screenHeight * 0.9,
-    minHeight: screenHeight * 0.7,
-  },
-  // Fix 8: Add drag indicator
-  dragIndicator: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#D1D5DB',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 8,
   },
   container: {
-    flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    maxHeight: '80%',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
@@ -383,141 +361,88 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
-  currentAssignmentInfo: {
-    backgroundColor: '#F8FAFC',
+  currentAgentInfo: {
+    backgroundColor: '#F0FDF4',
     padding: 16,
     borderRadius: 12,
     marginVertical: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#10B981',
   },
-  currentAssignmentLabel: {
-    fontSize: 12,
-    fontFamily: 'Outfit_500Medium',
-    color: '#6B7280',
+  currentAgentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  currentAssignmentName: {
+  currentAgentLabel: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: '#047857',
+  },
+  unassignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  unassignButtonText: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: '#EF4444',
+  },
+  currentAgentName: {
     fontSize: 16,
     fontFamily: 'Outfit_600SemiBold',
+    color: '#065F46',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    gap: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Outfit_400Regular',
     color: '#111827',
+  },
+  agentsContainer: {
+    flex: 1,
+    minHeight: 300,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
-    minHeight: 200,
   },
   loadingText: {
-    fontSize: 16,
-    fontFamily: 'Outfit_500Medium',
-    color: '#6B7280',
-    marginTop: 16,
-  },
-  agentsContainer: {
-    flex: 1,
-    minHeight: 300, // Fix 9: Ensure minimum height for agents container
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  agentsList: {
-    flex: 1,
-    // Fix 10: Set max height to prevent overflow
-    maxHeight: screenHeight * 0.4,
-  },
-  // Fix 11: Add content container style for FlatList
-  agentsListContent: {
-    paddingBottom: 10,
-  },
-  agentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  selectedAgentItem: {
-    borderColor: '#10B981',
-    backgroundColor: '#ECFDF5',
-  },
-  currentAgentItem: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EEF2FF',
-  },
-  agentInfo: {
-    flex: 1,
-  },
-  agentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  agentName: {
-    fontSize: 16,
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#111827',
-    flex: 1,
-  },
-  selectedAgentText: {
-    color: '#047857',
-  },
-  currentBadge: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  currentBadgeText: {
-    fontSize: 10,
-    fontFamily: 'Outfit_500Medium',
-    color: '#FFFFFF',
-  },
-  unavailableBadge: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  unavailableBadgeText: {
-    fontSize: 10,
-    fontFamily: 'Outfit_500Medium',
-    color: '#FFFFFF',
-  },
-  agentDetails: {
-    gap: 4,
-  },
-  agentDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  agentDetailText: {
     fontSize: 14,
-    fontFamily: 'Outfit_400Regular',
+    fontFamily: 'Outfit_500Medium',
     color: '#6B7280',
+    marginTop: 12,
   },
-  checkmark: {
-    marginLeft: 12,
-  },
-  emptyState: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 40,
-    minHeight: 200, // Fix 12: Ensure minimum height for empty state
   },
   emptyTitle: {
     fontSize: 18,
     fontFamily: 'Outfit_600SemiBold',
-    color: '#4B5563',
+    color: '#374151',
     marginTop: 16,
     marginBottom: 8,
   },
@@ -526,45 +451,100 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_400Regular',
     color: '#9CA3AF',
     textAlign: 'center',
+    marginBottom: 16,
   },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    // Fix 13: Ensure buttons are always visible
-    minHeight: 70,
+  clearSearchButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  actionButton: {
-    flex: 1,
+  clearSearchText: {
+    fontSize: 14,
+    fontFamily: 'Outfit_500Medium',
+    color: '#FFFFFF',
+  },
+  agentsList: {
+    paddingBottom: 20,
+  },
+  agentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  currentAgentItem: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#BBF7D0',
+  },
+  unavailableAgentItem: {
+    backgroundColor: '#F9FAFB',
+    borderColor: '#E5E7EB',
+    opacity: 0.7,
+  },
+  agentInfo: {
+    flex: 1,
+  },
+  agentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
     gap: 8,
   },
-  assignButton: {
-    backgroundColor: '#10B981',
-  },
-  assignButtonText: {
+  agentName: {
     fontSize: 16,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#111827',
+  },
+  currentAgentText: {
+    color: '#065F46',
+  },
+  unavailableText: {
+    color: '#9CA3AF',
+  },
+  currentBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  currentBadgeText: {
+    fontSize: 10,
     fontFamily: 'Outfit_600SemiBold',
     color: '#FFFFFF',
   },
-  unassignButton: {
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  unassignButtonText: {
-    fontSize: 16,
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#EF4444',
-  },
-  disabledButton: {
+  unavailableBadge: {
     backgroundColor: '#F3F4F6',
-    borderColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  unavailableBadgeText: {
+    fontSize: 10,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#6B7280',
+  },
+  agentContact: {
+    fontSize: 14,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  agentWorkload: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: '#9CA3AF',
+  },
+  agentActions: {
+    marginLeft: 12,
   },
 });
