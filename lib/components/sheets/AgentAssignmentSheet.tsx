@@ -17,9 +17,10 @@ interface Agent {
   id: string;
   name: string;
   phone: string;
-  email: string;
+  email?: string; // Make optional since API doesn't provide it
   isAvailable: boolean;
   activeServiceRequests: number;
+  alternativePhone?: string; // Add from API
 }
 
 interface AgentAssignmentSheetProps extends SheetProps {
@@ -57,7 +58,7 @@ export default function AgentAssignmentSheet({
       const filtered = agents.filter(agent =>
         agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         agent.phone.includes(searchQuery) ||
-        agent.email.toLowerCase().includes(searchQuery.toLowerCase())
+        (agent.email && agent.email.toLowerCase().includes(searchQuery.toLowerCase()))
       );
       setFilteredAgents(filtered);
     }
@@ -66,11 +67,26 @@ export default function AgentAssignmentSheet({
   const fetchAvailableAgents = async () => {
     setLoading(true);
     try {
-      const result = await apiService.get('/agents/available');
+      const result = await apiService.get('/agents');
+      console.log('result in fetching agents ', result.data)
+      
       if (result.success && result.data) {
-        setAgents(result.data.agents || []);
-        setFilteredAgents(result.data.agents || []);
+        // Transform API data to match component interface
+        const transformedAgents = (result.data.agents || result.data || []).map((apiAgent: any) => ({
+          id: apiAgent.id,
+          name: apiAgent.name,
+          phone: apiAgent.number, // Map 'number' to 'phone'
+          email: apiAgent.email || '', // Provide default empty string
+          isAvailable: apiAgent.active || true, // Use 'active' field or default to true
+          activeServiceRequests: apiAgent.serviceRequestsCount || 0, // Map field name
+          alternativePhone: apiAgent.alternativePhone,
+        }));
+        
+        console.log('Transformed agents:', transformedAgents);
+        setAgents(transformedAgents);
+        setFilteredAgents(transformedAgents);
       } else {
+        console.log('No agents data in response');
         setAgents([]);
         setFilteredAgents([]);
       }
@@ -95,7 +111,7 @@ export default function AgentAssignmentSheet({
       // Use the status update endpoint with ASSIGNED status and agentId
       const formData = new FormData();
       formData.append('status', 'ASSIGNED');
-      formData.append('assignedAgentId', agent.id);
+      formData.append('agentId', agent.id);
 
       const result = await apiService.patch(`/service-requests/${serviceRequestId}/status`, formData, {
         headers: {
@@ -201,7 +217,9 @@ export default function AgentAssignmentSheet({
             styles.agentContact,
             !agent.isAvailable && styles.unavailableText
           ]}>
-            {agent.phone} • {agent.email}
+            {agent.phone}
+            {agent.email && ` • ${agent.email}`}
+            {agent.alternativePhone && ` • Alt: ${agent.alternativePhone}`}
           </Text>
           
           <Text style={[
@@ -233,7 +251,6 @@ export default function AgentAssignmentSheet({
   return (
     <ActionSheet
       id={sheetId}
-      initialSnapIndex={0}
       gestureEnabled={true}
       closeOnTouchBackdrop={true}
       containerStyle={styles.actionSheetContainer}
@@ -278,8 +295,8 @@ export default function AgentAssignmentSheet({
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#9CA3AF" />
           <TextInput
-          style={styles.searchInput}
-            placeholder="Search agents by name, phone, or email"
+            style={styles.searchInput}
+            placeholder="Search agents by name or phone"
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
@@ -289,6 +306,13 @@ export default function AgentAssignmentSheet({
               <Ionicons name="close-circle" size={20} color="#9CA3AF" />
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* Debug Info - Remove in production */}
+        <View style={styles.debugContainer}>
+          <Text style={styles.debugText}>
+            Debug: Found {agents.length} agents, Filtered: {filteredAgents.length}
+          </Text>
         </View>
 
         {/* Agents List */}
@@ -307,7 +331,7 @@ export default function AgentAssignmentSheet({
               <Text style={styles.emptySubtitle}>
                 {searchQuery 
                   ? 'Try adjusting your search terms'
-                  : 'All agents are currently busy with other requests'
+                  : 'Check the API response or agent data structure'
                 }
               </Text>
               {searchQuery && (
@@ -339,11 +363,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    height: '100%'
   },
   container: {
     paddingHorizontal: 20,
     paddingBottom: 20,
-    maxHeight: '80%',
   },
   header: {
     flexDirection: 'row',
@@ -416,6 +440,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Outfit_400Regular',
     color: '#111827',
+  },
+  debugContainer: {
+    backgroundColor: '#FEF3C7',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  debugText: {
+    fontSize: 12,
+    fontFamily: 'Outfit_400Regular',
+    color: '#92400E',
   },
   agentsContainer: {
     flex: 1,

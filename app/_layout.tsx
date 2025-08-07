@@ -1,3 +1,4 @@
+// Your updated app/_layout.tsx
 import { AuthProvider, useAuth } from '@/lib/contexts/AuthContext';
 import { useColorScheme } from '@/lib/hooks/useColorScheme';
 import {
@@ -20,10 +21,13 @@ import { SheetProvider } from "react-native-actions-sheet";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import "../sheets";
+import { NotificationPermissionModal, useNotificationPermissionModal } from '@/lib/components/NotificationPermissionModal';
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { isLoading, isAuthenticated } = useAuth();
+  const { shouldShow, hideModal } = useNotificationPermissionModal();
+  
   const [loaded] = useFonts({
     Outfit_400Regular,
     Outfit_500Medium,
@@ -39,11 +43,6 @@ function RootLayoutNav() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SheetProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DefaultTheme : DefaultTheme}>
-          {/* <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-          > */}
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={{ flex: 1 }}>
               <Stack initialRouteName='(tabs)'>
@@ -57,9 +56,14 @@ function RootLayoutNav() {
                 <Stack.Screen name="+not-found" />
               </Stack>
               <StatusBar style="auto" />
+              
+              {/* Push Notification Permission Modal */}
+              <NotificationPermissionModal
+                visible={shouldShow}
+                onClose={hideModal}
+              />
             </View>
           </TouchableWithoutFeedback>
-          {/* </KeyboardAvoidingView> */}
         </ThemeProvider>
       </SheetProvider>
     </GestureHandlerRootView>

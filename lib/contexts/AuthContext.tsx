@@ -7,6 +7,7 @@ import {
 import { router } from 'expo-router';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { apiService } from '../api/api';
+import { PushNotificationService } from '@/lib/utils/PushNotificationService'; // Import the service
 
 export enum UserRole {
     CUSTOMER = 'customer',
@@ -97,10 +98,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
 
     const isAuthenticated = !!user;
+    
+    // Get push notification service instance
+    const pushNotificationService = PushNotificationService.getInstance();
 
     useEffect(() => {
         initializeAuth();
+        
+        // Setup notification listeners
+        const listeners = pushNotificationService.setupNotificationListeners();
+        
+        // Cleanup listeners on unmount
+        return () => {
+            listeners.notificationListener.remove();
+            listeners.responseListener.remove();
+        };
     }, []);
+
+    // Initialize push notifications when user logs in
+    useEffect(() => {
+        if (user && !viewAsState.isViewingAs) {
+            // Initialize push notifications after successful login
+            pushNotificationService.initializePushNotifications();
+        }
+    }, [user, viewAsState.isViewingAs]);
 
     const initializeAuth = async () => {
         try {
@@ -174,7 +195,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             console.log('Backend login response:', response);
 
             if (response.success) {
-                const { accessToken, refreshToken, user: userData,franchiseId } = response.data;
+                const { accessToken, refreshToken, user: userData, franchiseId } = response.data;
 
                 // Store tokens and user data
                 await AsyncStorage.multiSet([
@@ -183,8 +204,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     ['userProfile', JSON.stringify(userData)],
                 ]);
 
-                setUser({...userData,franchiseId});
+                const userWithFranchise = { ...userData, franchiseId };
+                setUser(userWithFranchise);
                 setConfirmation(null); // Clear confirmation after successful verification
+                
+                // Initialize push notifications after successful login
+                // Note: This will be handled by the useEffect above
+                
                 return true;
             } else {
                 throw new Error(response.error || 'Login failed');
@@ -211,6 +237,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const logout = async () => {
         try {
+            // Clear push notification token
+            await pushNotificationService.clearToken();
+            
             // Sign out from Firebase
             await signOut(getAuth());
 
@@ -368,11 +397,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const refreshUser = async () => {
         try {
             const response = await apiService.get('/auth/me');
-            console.log('response in auth me ',response)
+            console.log('response in auth me ', response)
             if (response.success) {
                 // Only update if not in view-as mode
                 if (!viewAsState.isViewingAs) {
-                    setUser({...response.data.user,franchiseId:response.data.franchiseId});
+                    setUser({ ...response.data.user, franchiseId: response.data.franchiseId });
                     await AsyncStorage.setItem('userProfile', JSON.stringify(response.data));
                 }
             }

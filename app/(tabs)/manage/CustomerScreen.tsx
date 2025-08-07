@@ -211,7 +211,7 @@ const CustomerScreen = () => {
             <TouchableOpacity
               key={item.id}
               style={styles.customerCard}
-              onPress={() => router.push(`/customer/${item.id}`)}
+              onPress={() => router.push('/customers/deba318b-6b12-4882-8e39-d6debe416854')}
               activeOpacity={0.7}
             >
               {/* Customer Header */}

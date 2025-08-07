@@ -12,7 +12,9 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import ActionSheet, { ActionSheetRef } from 'react-native-actions-sheet';
@@ -44,6 +46,7 @@ export const ServiceRequestDetailsScreen = () => {
   const [beforeImages, setBeforeImages] = useState<string[]>([]);
   const [afterImages, setAfterImages] = useState<string[]>([]);
   const { user } = useAuth();
+  const [showQR, setShowQR] = useState(false);
 
   const imageViewerRef = useRef<ActionSheetRef>(null);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -480,6 +483,54 @@ export const ServiceRequestDetailsScreen = () => {
                   )}
 
                   {request.paymentStatus?.razorpayPaymentLink && (
+                    <View style={styles.paymentContainer}>
+                      {/* Existing payment link button */}
+                      <TouchableOpacity
+                        style={styles.paymentLinkButton}
+                        onPress={() => Linking.openURL(request.paymentStatus?.razorpayPaymentLink || '')}
+                      >
+                        <Ionicons name="link" size={16} color="#3B82F6" />
+                        <Text style={styles.paymentLinkText}>View Payment Link</Text>
+                      </TouchableOpacity>
+
+                      {/* QR Code button */}
+                      <TouchableOpacity
+                        style={styles.qrButton}
+                        onPress={() => setShowQR(true)}
+                      >
+                        <Ionicons name="qr-code" size={16} color="#3B82F6" />
+                        <Text style={styles.qrButtonText}>Show QR Code</Text>
+                      </TouchableOpacity>
+
+                      {/* QR Code Modal */}
+                      <Modal
+                        visible={showQR}
+                        transparent={true}
+                        animationType="fade"
+                        onRequestClose={() => setShowQR(false)}
+                      >
+                        <View style={styles.modalOverlay}>
+                          <View style={styles.qrContainer}>
+                            <Text style={styles.qrTitle}>Scan to Pay</Text>
+                            <QRCode
+                              value={request.paymentStatus?.razorpayPaymentLink || ''}
+                              size={200}
+                              color="black"
+                              backgroundColor="white"
+                            />
+                            <TouchableOpacity
+                              style={styles.closeButton}
+                              onPress={() => setShowQR(false)}
+                            >
+                              <Text style={styles.closeButtonText}>Close</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </Modal>
+                    </View>
+                  )}
+
+                  {/* {request.paymentStatus?.razorpayPaymentLink && (
                     <TouchableOpacity
                       style={styles.paymentLinkButton}
                       onPress={() => Linking.openURL(request.paymentStatus?.razorpayPaymentLink || '')}
@@ -487,7 +538,7 @@ export const ServiceRequestDetailsScreen = () => {
                       <Ionicons name="link" size={16} color="#3B82F6" />
                       <Text style={styles.paymentLinkText}>View Payment Link</Text>
                     </TouchableOpacity>
-                  )}
+                  )} */}
 
                   {request.paymentStatus?.razorpaySubscriptionId && (
                     <TouchableOpacity
@@ -930,20 +981,72 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_600SemiBold',
     marginLeft: 8,
   },
+  paymentContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
   paymentLinkButton: {
-    backgroundColor: '#EEF2FF',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    flex: 1,
   },
   paymentLinkText: {
     color: '#3B82F6',
-    fontFamily: 'Outfit_600SemiBold',
-    marginLeft: 8,
+    fontSize: 12,
+    fontWeight: '500',
   },
+  qrButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+    flex: 1,
+  },
+  qrButtonText: {
+    color: '#16A34A',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrContainer: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    margin: 20,
+  },
+  qrTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    color: '#1F2937',
+  },
+  closeButton: {
+    marginTop: 16,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  closeButtonText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+ 
   imageViewerContent: {
     height: screenWidth * 1.2,
     backgroundColor: '#000000',
