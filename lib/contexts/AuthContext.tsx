@@ -1,3 +1,4 @@
+import { PushNotificationService } from '@/lib/utils/PushNotificationService'; // Import the service
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     FirebaseAuthTypes, getAuth,
@@ -7,7 +8,6 @@ import {
 import { router } from 'expo-router';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { apiService } from '../api/api';
-import { PushNotificationService } from '@/lib/utils/PushNotificationService'; // Import the service
 
 export enum UserRole {
     CUSTOMER = 'customer',
@@ -59,7 +59,7 @@ interface AuthContextType {
     verifyOTP: (otp: string, role: string) => Promise<boolean>;
     logout: () => Promise<void>;
 
-    // View As functionality (client-side only)
+    // view functionality (client-side only)
     viewAsFranchiseOwner: (franchiseId: string, franchiseName: string) => void;
     viewAsServiceAgent: (agentId: string, agentName: string, franchiseId: string) => void;
     exitViewAs: () => void;
@@ -269,7 +269,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ]);
     };
 
-    // Client-side only view as functionality
+    // Client-side only view functionality
     const viewAsFranchiseOwner = (franchiseId: string, franchiseName: string) => {
         if (!user || user.role !== UserRole.ADMIN) {
             return;

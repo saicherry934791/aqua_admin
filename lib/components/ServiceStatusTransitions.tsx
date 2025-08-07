@@ -35,7 +35,7 @@ export const ServiceStatusTransitions: React.FC<ServiceStatusTransitionsProps> =
   onAssignAgent,
   onScheduleService,
 }) => {
-  const availableTransitions = getAvailableTransitions(request.status, userRole, validTransitions);
+  const availableTransitions = getAvailableTransitions(request,request.status, userRole, validTransitions);
   
   const handleTransition = (toStatus: ServiceRequestStatus) => {
     // Special handling for specific transitions

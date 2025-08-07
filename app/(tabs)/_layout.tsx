@@ -1,7 +1,7 @@
+import { MaterialIcons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Colors } from '@/lib/constants/Colors';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
@@ -70,7 +70,7 @@ export default function TabLayout() {
 
   return (
     <View style={styles.container}>
-      {/* View As Header Banner */}
+      {/* view Header Banner */}
       {viewAsState.isViewingAs && (
         <View style={styles.viewAsHeader}>
           <View style={styles.viewAsContent}>
@@ -117,7 +117,7 @@ export default function TabLayout() {
         })}
       </Tabs>
 
-      {/* Exit View As Button - Bottom Fixed */}
+      {/* Exit view Button - Bottom Fixed */}
       {viewAsState.isViewingAs && (
         <View style={styles.exitViewContainer}>
           <TouchableOpacity 

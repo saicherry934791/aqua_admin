@@ -3,9 +3,9 @@ import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'active' | 'inactive' | 'recent';
@@ -162,7 +162,7 @@ const AgentScreen = () => {
         const options = [
             'View Details',
             'Edit Agent',
-            ...(user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER ? ['View as Agent'] : []),
+            ...(user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER ? ['View Agent'] : []),
             agent.isActive ? 'Deactivate' : 'Activate',
             'Cancel'
         ];
@@ -192,7 +192,7 @@ const AgentScreen = () => {
             ];
 
             if (user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER) {
-                alertOptions.push({ text: 'View as Agent', onPress: () => handleActionSheetResponse(agent, 2) });
+                alertOptions.push({ text: 'view Agent', onPress: () => handleActionSheetResponse(agent, 2) });
             }
 
             alertOptions.push({
@@ -392,7 +392,7 @@ const AgentScreen = () => {
                                     </View>
                                 </View>
 
-                                {/* View As Button for Admin and Franchise Owner */}
+                                {/* view Button for Admin and Franchise Owner */}
                                 {(user?.role === UserRole.ADMIN || user?.role === UserRole.FRANCHISE_OWNER) && (
                                     <View style={styles.actionButtonsRow}>
                                         <TouchableOpacity
@@ -400,7 +400,7 @@ const AgentScreen = () => {
                                             onPress={() => handleViewAsAgent(item)}
                                         >
                                             <Ionicons name="eye" size={16} color="#10B981" />
-                                            <Text style={styles.viewAsButtonText}>View as Agent</Text>
+                                            <Text style={styles.viewAsButtonText}>view Agent</Text>
                                         </TouchableOpacity>
                                     </View>
                                 )}

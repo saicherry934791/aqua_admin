@@ -62,29 +62,34 @@ export const formatDate = (dateString: string) => {
 };
 
 export const getAvailableTransitions = (
-  currentStatus: ServiceRequestStatus, 
+  request: any,
+  currentStatus: ServiceRequestStatus,
   userRole: UserRole,
   validTransitions: Record<ServiceRequestStatus, ServiceRequestStatus[]>
 ): ServiceRequestStatus[] => {
   const possibleTransitions = validTransitions[currentStatus] || [];
-  
+
   // Filter transitions based on user role
   return possibleTransitions.filter(transition => {
     // Only admins and franchise owners can assign agents
-    if (transition === ServiceRequestStatus.ASSIGNED && 
-        currentStatus === ServiceRequestStatus.CREATED && 
-        userRole !== UserRole.ADMIN && 
-        userRole !== UserRole.FRANCHISE_OWNER) {
+    if (transition === ServiceRequestStatus.ASSIGNED &&
+      currentStatus === ServiceRequestStatus.CREATED &&
+      userRole !== UserRole.ADMIN &&
+      userRole !== UserRole.FRANCHISE_OWNER) {
       return false;
     }
-    
+
     // Only admins and franchise owners can reactivate cancelled requests
-    if (currentStatus === ServiceRequestStatus.CANCELLED && 
-        userRole !== UserRole.ADMIN && 
-        userRole !== UserRole.FRANCHISE_OWNER) {
+    if (currentStatus === ServiceRequestStatus.CANCELLED &&
+      userRole !== UserRole.ADMIN &&
+      userRole !== UserRole.FRANCHISE_OWNER) {
       return false;
     }
-    
+    if (currentStatus === ServiceRequestStatus.IN_PROGRESS && request.type !== 'installtion' && transition === ServiceRequestStatus.PAYMENT_PENDING) {
+      return false
+
+    }
+
     return true;
   });
 };
@@ -97,23 +102,22 @@ export const requiresImageValidation = (
   afterImages: string[]
 ): { valid: boolean; message?: string } => {
   // Starting IN_PROGRESS requires before images for installation
-  if (toStatus === ServiceRequestStatus.IN_PROGRESS && 
-      serviceType === ServiceType.INSTALLATION && 
-      beforeImages.length === 0) {
+  if (toStatus === ServiceRequestStatus.IN_PROGRESS &&
+    beforeImages.length === 0) {
     return { valid: false, message: 'Before images are required to start installation service' };
   }
-  
+
   // Requesting payment requires after images
   if (toStatus === ServiceRequestStatus.PAYMENT_PENDING && afterImages.length === 0) {
     return { valid: false, message: 'After images are required to request payment' };
   }
-  
+
   // Completing service (not from payment pending) requires after images
-  if (toStatus === ServiceRequestStatus.COMPLETED && 
-      fromStatus !== ServiceRequestStatus.PAYMENT_PENDING && 
-      afterImages.length === 0) {
+  if (toStatus === ServiceRequestStatus.COMPLETED &&
+    fromStatus !== ServiceRequestStatus.PAYMENT_PENDING &&
+    afterImages.length === 0) {
     return { valid: false, message: 'After images are required to complete service' };
   }
-  
+
   return { valid: true };
 };

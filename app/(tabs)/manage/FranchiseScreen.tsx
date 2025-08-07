@@ -4,9 +4,9 @@ import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'active' | 'pending' | 'company' | 'franchised';
@@ -136,7 +136,7 @@ const FranchiseScreen = () => {
     const options = [
       'View Details',
       'Edit Franchise',
-      'View as Franchise',
+      'View  Franchise',
       franchise.status === 'Active' ? 'Deactivate' : 'Activate',
       'Cancel'
     ];
@@ -163,7 +163,7 @@ const FranchiseScreen = () => {
         [
           { text: 'View Details', onPress: () => handleActionSheetResponse(franchise, 0) },
           { text: 'Edit Franchise', onPress: () => handleActionSheetResponse(franchise, 1) },
-          { text: 'View as Franchise', onPress: () => handleActionSheetResponse(franchise, 2) },
+          { text: 'view Franchise', onPress: () => handleActionSheetResponse(franchise, 2) },
           {
             text: franchise.status === 'Active' ? 'Deactivate' : 'Activate',
             style: franchise.status === 'Active' ? 'destructive' : 'default',
@@ -373,14 +373,14 @@ const FranchiseScreen = () => {
                   </View>
                 </View>
 
-                {/* View As Button */}
+                {/* view Button */}
                 <View style={styles.actionButtonsRow}>
                   <TouchableOpacity 
                     style={styles.viewAsButton}
                     onPress={() => handleViewAsFranchise(item)}
                   >
                     <Ionicons name="eye" size={16} color="#3B82F6" />
-                    <Text style={styles.viewAsButtonText}>View as Franchise</Text>
+                    <Text style={styles.viewAsButtonText}>view Franchise</Text>
                   </TouchableOpacity>
                 </View>
               </View>
