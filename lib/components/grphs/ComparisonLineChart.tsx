@@ -20,7 +20,7 @@ export const ComparisonLineChart: React.FC<LineChartProps> = ({
   const colors = colorPalettes[colorPalette] || colorPalettes.vibrant;
   const enhancedConfig = getEnhancedConfig(colorPalette, 'line');
 
-  console.log('data is ',data)
+  
 
   return (
     <View style={chartStyles.chartContainer}>

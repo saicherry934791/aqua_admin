@@ -1,4 +1,4 @@
-import { PushNotificationService } from '@/lib/utils/PushNotificationService'; // Import the service
+import { PushNotificationService } from '@/lib/utils/PushNotificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     FirebaseAuthTypes, getAuth,
@@ -59,10 +59,10 @@ interface AuthContextType {
     verifyOTP: (otp: string, role: string) => Promise<boolean>;
     logout: () => Promise<void>;
 
-    // view functionality (client-side only)
-    viewAsFranchiseOwner: (franchiseId: string, franchiseName: string) => void;
-    viewAsServiceAgent: (agentId: string, agentName: string, franchiseId: string) => void;
-    exitViewAs: () => void;
+    // Backend-integrated view functionality
+    viewAsFranchiseOwner: (franchiseId: string, franchiseName: string) => Promise<boolean>;
+    viewAsServiceAgent: (agentId: string, agentName: string, franchiseId: string) => Promise<boolean>;
+    exitViewAs: () => Promise<boolean>;
 
     // Permission checking
     hasPermission: (permission: string) => boolean;
@@ -98,16 +98,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     });
 
     const isAuthenticated = !!user;
-    
+
     // Get push notification service instance
     const pushNotificationService = PushNotificationService.getInstance();
 
     useEffect(() => {
         initializeAuth();
-        
+
         // Setup notification listeners
         const listeners = pushNotificationService.setupNotificationListeners();
-        
+
         // Cleanup listeners on unmount
         return () => {
             listeners.notificationListener.remove();
@@ -139,6 +139,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 if (viewAsData[1]) {
                     const parsedViewAs = JSON.parse(viewAsData[1]);
                     setViewAsState(parsedViewAs);
+
+                    // Verify view-as session is still valid with backend
+                    try {
+                        const statusResponse = await apiService.get('/view-as/status');
+                        if (!statusResponse.success || !statusResponse.data.isViewingAs) {
+                            // View-as session expired, clear local state
+                            await clearViewAsState();
+                        }
+                    } catch (error) {
+                        console.log('Error checking view-as status:', error);
+                        await clearViewAsState();
+                    }
                 }
 
                 // Validate token with backend
@@ -150,6 +162,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const clearViewAsState = async () => {
+        setViewAsState({
+            isViewingAs: false,
+            originalUser: null,
+            currentViewRole: null,
+        });
+        await AsyncStorage.removeItem('viewAsState');
     };
 
     const sendOTP = async (phoneNumber: string, customerType: CustomerType): Promise<FirebaseAuthTypes.ConfirmationResult> => {
@@ -175,7 +196,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     const verifyOTP = async (otp: string, role: string): Promise<boolean> => {
         try {
-            // Don't set loading here as it's handled by the OTP screen
             if (!confirmation) {
                 throw new Error('No OTP confirmation found. Please request a new OTP.');
             }
@@ -189,7 +209,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Send idToken and role to backend for authentication
             const response = await apiService.post('/auth/login', {
                 idToken,
-                role, // Send the role that was selected during login
+                role,
             });
 
             console.log('Backend login response:', response);
@@ -206,22 +226,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 const userWithFranchise = { ...userData, franchiseId };
                 setUser(userWithFranchise);
-                setConfirmation(null); // Clear confirmation after successful verification
-                
-                // Initialize push notifications after successful login
-                // Note: This will be handled by the useEffect above
-                
+                setConfirmation(null);
+
                 return true;
             } else {
                 throw new Error(response.error || 'Login failed');
             }
         } catch (error: any) {
             console.log('Verify OTP error:', error);
-            
-            // Clear confirmation on error so user can try again
             setConfirmation(null);
-            
-            // Re-throw with a user-friendly message
+
             if (error.code === 'auth/invalid-verification-code') {
                 throw new Error('Invalid OTP. Please check the code and try again.');
             } else if (error.code === 'auth/code-expired') {
@@ -230,7 +244,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 throw new Error(error.message || 'OTP verification failed. Please try again.');
             }
         } finally {
-            // Ensure loading state is cleared
             setIsLoading(false);
         }
     };
@@ -239,7 +252,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
             // Clear push notification token
             await pushNotificationService.clearToken();
-            
+
             // Sign out from Firebase
             await signOut(getAuth());
 
@@ -249,11 +262,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Reset state
             setUser(null);
             setConfirmation(null);
-            setViewAsState({
-                isViewingAs: false,
-                originalUser: null,
-                currentViewRole: null,
-            });
+            await clearViewAsState();
+
             router.replace('/(auth)')
         } catch (error) {
             console.log('Logout error:', error);
@@ -269,93 +279,160 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         ]);
     };
 
-    // Client-side only view functionality
-    const viewAsFranchiseOwner = (franchiseId: string, franchiseName: string) => {
-        if (!user || user.role !== UserRole.ADMIN) {
-            return;
-        }
-
-        // Create a mock franchise owner user based on the original admin user
-        const franchiseUser: User = {
-            ...user,
-            role: UserRole.FRANCHISE_OWNER,
-            customerType: CustomerType.FRANCHISE,
-            franchiseId: franchiseId,
-            franchiseName: franchiseName,
-        };
-
-        const newViewAsState: ViewAsState = {
-            isViewingAs: true,
-            originalUser: user,
-            currentViewRole: UserRole.FRANCHISE_OWNER,
-            targetFranchiseId: franchiseId,
-            targetFranchiseName: franchiseName,
-        };
-
-        setViewAsState(newViewAsState);
-        setUser(franchiseUser);
-
-        // Persist view state
-        AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
-    };
-
-    const viewAsServiceAgent = (agentId: string, agentName: string, franchiseId: string) => {
-        if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.FRANCHISE_OWNER)) {
-            return;
-        }
-
-        // Create a mock service agent user based on the original user
-        const agentUser: User = {
-            ...user,
-            role: UserRole.SERVICE_AGENT,
-            customerType: CustomerType.AGENT,
-            franchiseId: franchiseId,
-            profile: {
-                ...user.profile,
-                name: agentName,
+    // Backend-integrated view functionality
+    const viewAsFranchiseOwner = async (franchiseId: string, franchiseName: string): Promise<boolean> => {
+        try {
+            if (!user || user.role !== UserRole.ADMIN) {
+                throw new Error('Only admins can view as franchise owners');
             }
-        };
 
-        const newViewAsState: ViewAsState = {
-            isViewingAs: true,
-            originalUser: viewAsState.isViewingAs ? viewAsState.originalUser : user,
-            currentViewRole: UserRole.SERVICE_AGENT,
-            targetFranchiseId: franchiseId,
-            targetUserId: agentId,
-            targetUserName: agentName,
-        };
+            setIsLoading(true);
 
-        setViewAsState(newViewAsState);
-        setUser(agentUser);
+            const response = await apiService.post('/view-as/franchise-owner', {
+                franchiseId
+            });
 
-        // Persist view state
-        AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
+            if (response.success) {
+                const { accessToken, viewAsContext } = response.data;
+
+                // Update token
+                await AsyncStorage.setItem('accessToken', accessToken);
+
+                // Create view-as state
+                const newViewAsState: ViewAsState = {
+                    isViewingAs: true,
+                    originalUser: user,
+                    currentViewRole: UserRole.FRANCHISE_OWNER,
+                    targetFranchiseId: franchiseId,
+                    targetFranchiseName: franchiseName,
+                };
+
+                // Create franchise user
+                const franchiseUser: User = {
+                    ...user,
+                    role: UserRole.FRANCHISE_OWNER,
+                    customerType: CustomerType.FRANCHISE,
+                    franchiseId: franchiseId,
+                    franchiseName: franchiseName,
+                };
+
+                setViewAsState(newViewAsState);
+                setUser(franchiseUser);
+
+                // Persist view state
+                await AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
+
+                return true;
+            } else {
+                throw new Error(response.error || 'Failed to view as franchise owner');
+            }
+        } catch (error: any) {
+            console.log('View as franchise owner error:', error);
+            throw new Error(error.message || 'Failed to view as franchise owner');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const exitViewAs = () => {
-        if (!viewAsState.isViewingAs || !viewAsState.originalUser) {
-            return;
+    const viewAsServiceAgent = async (agentId: string, agentName: string, franchiseId: string): Promise<boolean> => {
+        try {
+            if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.FRANCHISE_OWNER)) {
+                throw new Error('Only admins and franchise owners can view as service agents');
+            }
+
+            setIsLoading(true);
+
+            const response = await apiService.post('/view-as/service-agent', {
+                agentId,
+                franchiseId
+            });
+            console.log('response from bc fro vaservcie ', response)
+
+            if (response.success) {
+                const { accessToken, viewAsContext } = response.data;
+
+                // Update token
+                await AsyncStorage.setItem('accessToken', accessToken);
+
+                // Create view-as state
+                const newViewAsState: ViewAsState = {
+                    isViewingAs: true,
+                    originalUser: viewAsState.isViewingAs ? viewAsState.originalUser : user,
+                    currentViewRole: UserRole.SERVICE_AGENT,
+                    targetFranchiseId: franchiseId,
+                    targetUserId: agentId,
+                    targetUserName: agentName,
+                };
+
+                // Create agent user
+                const agentUser: User = {
+                    ...user,
+                    role: UserRole.SERVICE_AGENT,
+                    customerType: CustomerType.AGENT,
+                    franchiseId: franchiseId,
+                    profile: {
+                        ...user.profile,
+                        name: agentName,
+                    }
+                };
+
+                setViewAsState(newViewAsState);
+                setUser(agentUser);
+
+                // Persist view state
+                await AsyncStorage.setItem('viewAsState', JSON.stringify(newViewAsState));
+
+                return true;
+            } else {
+                throw new Error(response.error || 'Failed to view as service agent');
+            }
+        } catch (error: any) {
+            console.log('View as service agent error:', error);
+            throw new Error(error.message || 'Failed to view as service agent');
+        } finally {
+            setIsLoading(false);
         }
+    };
 
-        // Restore original user
-        setUser(viewAsState.originalUser);
-        setViewAsState({
-            isViewingAs: false,
-            originalUser: null,
-            currentViewRole: null,
-        });
+    const exitViewAs = async (): Promise<boolean> => {
+        try {
+            if (!viewAsState.isViewingAs || !viewAsState.originalUser) {
+                return false;
+            }
 
-        // Clear persisted view state
-        AsyncStorage.removeItem('viewAsState');
+            setIsLoading(true);
+
+            const response = await apiService.post('/view-as/exit');
+
+            if (response.success) {
+                const { accessToken } = response.data;
+
+                // Update token
+                await AsyncStorage.setItem('accessToken', accessToken);
+
+                // Restore original user
+                setUser(viewAsState.originalUser);
+                await clearViewAsState();
+
+                return true;
+            } else {
+                throw new Error(response.error || 'Failed to exit view as mode');
+            }
+        } catch (error: any) {
+            console.log('Exit view as error:', error);
+            throw new Error(error.message || 'Failed to exit view as mode');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const hasPermission = (permission: string): boolean => {
         if (!user) return false;
-        
-        // If viewing as someone else, check original user's permissions
+
+        // If viewing as someone else, check original user's permissions for admin actions
         const checkUser = viewAsState.isViewingAs ? viewAsState.originalUser : user;
         if (!checkUser) return false;
-        
+
         return checkUser.permissions.includes(permission);
     };
 
@@ -404,6 +481,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     setUser({ ...response.data.user, franchiseId: response.data.franchiseId });
                     await AsyncStorage.setItem('userProfile', JSON.stringify(response.data));
                 }
+            } else {
+                await clearAuthData();
+                setUser(null);
+                await clearViewAsState();
+                router.replace('/(auth)')
             }
         } catch (error: any) {
             console.log('Refresh user error:', error);
@@ -411,6 +493,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (error?.response?.status === 401) {
                 await clearAuthData();
                 setUser(null);
+                await clearViewAsState();
+                router.replace('/(auth)')
             }
         }
     };

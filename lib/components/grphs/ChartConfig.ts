@@ -37,7 +37,8 @@ export const baseChartConfig: ChartConfig = {
   propsForLabels: {
     fontSize: 12,
     fontWeight: 'bold',
-    fill: '#333333'
+    fill: '#333333',
+    dy: 20
   }
 };
 
@@ -53,7 +54,8 @@ export const getEnhancedConfig = (
     color: (opacity = 1) => colors[0],
     propsForDots: {
       ...baseChartConfig.propsForDots,
-      stroke: colors[0]
+      stroke: colors[0],
+      dy: 20
     }
   };
 

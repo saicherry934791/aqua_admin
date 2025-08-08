@@ -6,7 +6,7 @@ import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
 import { router, useNavigation } from 'expo-router';
 import { Activity, ChartBar as BarChart3, Bell, Calendar, DollarSign, LocationEdit as Edit3, MapPin, Package, TrendingUp, Users, Wrench } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { SheetManager } from 'react-native-actions-sheet';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -109,6 +109,106 @@ export default function DashboardScreen() {
 
   const navigation = useNavigation();
 
+  function getLocalDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // Helper function to format trend values
+  const formatTrend = (change: number | null | undefined) => {
+    if (change === null || change === undefined || change === 0) return null;
+    return change > 0 ? `+${change}%` : `${change}%`;
+  };
+
+  // Helper function to format currency
+  const formatCurrency = (value: number) => {
+    if (value >= 100000) {
+      return `₹${(value / 100000).toFixed(1)}L`;
+    } else if (value >= 1000) {
+      return `₹${(value / 1000).toFixed(0)}K`;
+    }
+    return `₹${value}`;
+  };
+
+  // Transform API data for pie charts
+  const transformPieChartData = (apiData: any[], valueKey: string, nameKey: string) => {
+    const colors = ['#007bff', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+    return apiData.map((item, index) => ({
+      name: item[nameKey].replace(/_/g, ' '),
+      population: item[valueKey],
+      color: colors[index % colors.length]
+    }));
+  };
+
+  // Transform time series data for line charts
+  const transformTimeSeriesData = (timeSeriesData: any) => {
+    // Extract dates from all time series
+    const allDates = new Set();
+    Object.values(timeSeriesData).forEach((series: any[]) => {
+      series.forEach(item => allDates.add(item.date));
+    });
+
+    const sortedDates = Array.from(allDates).sort();
+    const labels = sortedDates.map(date => {
+      const d = new Date(date);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    const datasets = [];
+
+    // Revenue data
+    if (timeSeriesData.revenue) {
+      const revenueData = sortedDates.map(date => {
+        const item = timeSeriesData.revenue.find(r => r.date === date);
+        return item ? item.revenue : 0;
+      });
+      datasets.push({
+        label: 'Revenue',
+        data: revenueData
+      });
+    }
+
+    // Installation requests
+    if (timeSeriesData.installationRequests) {
+      const installationData = sortedDates.map(date => {
+        const item = timeSeriesData.installationRequests.find(r => r.date === date);
+        return item ? item.count : 0;
+      });
+      datasets.push({
+        label: 'Installations',
+        data: installationData
+      });
+    }
+
+    // Subscriptions
+    if (timeSeriesData.subscriptions) {
+      const subscriptionData = sortedDates.map(date => {
+        const item = timeSeriesData.subscriptions.find(r => r.date === date);
+        return item ? item.count : 0;
+      });
+      datasets.push({
+        label: 'Subscriptions',
+        data: subscriptionData
+      });
+    }
+
+    // Service completions for agents
+    if (timeSeriesData.dailyCompletions) {
+      const completionData = sortedDates.map(date => {
+        const item = timeSeriesData.dailyCompletions.find(r => r.date === date);
+        return item ? item.count : 0;
+      });
+      datasets.push({
+        label: 'Completions',
+        data: completionData
+      });
+    }
+
+    return { labels, datasets };
+  };
+
   // Fetch dashboard data from API
   const fetchDashboardData = async () => {
     if (!user) return;
@@ -116,13 +216,13 @@ export default function DashboardScreen() {
     setIsDashboardLoading(true);
     try {
       const params = new URLSearchParams({
-        from: startDate.toISOString().split('T')[0],
-        to: endDate.toISOString().split('T')[0],
+        from: getLocalDateString(startDate),
+        to: getLocalDateString(endDate),
       });
+      console.log('Fetching dashboard data with params:', params.toString());
 
-      const result = await apiService.get(`/dashboard/stats?${params}`);
-
-   
+      const result = await apiService.get(`/dashboard?${params}`);
+      console.log('Dashboard response:', JSON.stringify(result, null, 2));
 
       if (result.success) {
         setDashboardData(result.data);
@@ -130,9 +230,8 @@ export default function DashboardScreen() {
         // Fallback to mock data if API fails
         setDashboardData(getMockDashboardData());
       }
-      setDashboardData(getMockDashboardData());
     } catch (error) {
-     
+      console.error('Dashboard API error:', error);
       // Fallback to mock data
       setDashboardData(getMockDashboardData());
     } finally {
@@ -142,58 +241,64 @@ export default function DashboardScreen() {
 
   // Mock data fallback
   const getMockDashboardData = () => ({
-    overview: {
-      totalRevenue: { value: 250000, trend: '+12.5%' },
-      activeFranchises: { value: 15, trend: '+2' },
-      totalOrders: { value: 342, trend: '+8.3%' },
-      serviceRequests: { value: 28, trend: '-2.1%' },
-      monthlyRevenue: { value: 45000, trend: '+15.2%' },
-      activeOrders: { value: 42, trend: '+5' },
-      newCustomers: { value: 15, trend: '+8' },
-      serviceTasks: { value: 12, trend: '-2' },
-      todaysTasks: { value: 8, trend: null },
-      completedTasks: { value: 5, trend: null },
-      pendingTasks: { value: 3, trend: null },
-      weeklyTasks: { value: 32, trend: null }
+    stats: {
+      revenue: 250000,
+      revenueChange: 12.5,
+      totalFranchises: 15,
+      totalInstallationRequests: 342,
+      installationRequestsChange: 8.3,
+      totalServiceRequests: 28,
+      serviceRequestsChange: -2.1,
+      totalCustomers: 156,
+      customersChange: 15,
+      totalSubscriptions: 89,
+      subscriptionsChange: 12,
+      activeSubscriptions: 76,
+      completedInstallationRequests: 280,
+      completedServiceRequests: 20,
+      assignedServiceRequests: 8,
+      scheduledServiceRequests: 5,
+      inProgressServiceRequests: 3
     },
-    trends: {
-      orderDistribution: [
-        { name: 'Active Orders', population: 45, color: '#007bff' },
-        { name: 'Completed', population: 30, color: '#10B981' },
-        { name: 'Pending', population: 15, color: '#F59E0B' },
-        { name: 'Cancelled', population: 10, color: '#EF4444' }
+    pieCharts: {
+      usersByRole: [
+        { role: 'admin', count: 5 },
+        { role: 'franchise_owner', count: 15 },
+        { role: 'service_agent', count: 25 },
+        { role: 'customer', count: 156 }
       ],
-      revenueOrdersTrend: {
-        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        datasets: [
-          {
-            label: 'Revenue',
-            data: [4000, 3000, 2000, 2780, 1890, 2390],
-          },
-          {
-            label: 'Orders',
-            data: [240, 139, 980, 390, 480, 380],
-          },
-        ],
-      },
-      performanceByCategory: {
-        labels: ['Products', 'Services', 'Rentals', 'Sales'],
-        datasets: [
-          {
-            label: 'Values',
-            data: [25, 15, 30, 20],
-          },
-        ],
-      }
+      installationRequestsByStatus: [
+        { status: 'COMPLETED', count: 280 },
+        { status: 'IN_PROGRESS', count: 42 },
+        { status: 'PENDING', count: 20 }
+      ],
+      serviceRequestsByStatus: [
+        { status: 'COMPLETED', count: 20 },
+        { status: 'IN_PROGRESS', count: 5 },
+        { status: 'CANCELLED', count: 3 }
+      ],
+      subscriptionsByStatus: [
+        { status: 'ACTIVE', count: 76 },
+        { status: 'CANCELLED', count: 13 }
+      ]
     },
-    finance: {
-      totalIncome: { value: 750000, trend: '+18.5%' },
-      expenses: { value: 250000, trend: '+5.2%' },
-      netProfit: { value: 500000, trend: '+25.8%' },
-      franchiseRevenue: { value: 420000, trend: '+12.3%' },
-      orderRevenue: { value: 45000, trend: '+15.2%' },
-      serviceRevenue: { value: 12000, trend: '+8.7%' },
-      monthlyGrowth: { value: 15, trend: '+3.2%' }
+    timeSeriesData: {
+      revenue: [
+        { date: '2025-08-01', revenue: 4000 },
+        { date: '2025-08-02', revenue: 3000 },
+        { date: '2025-08-03', revenue: 2000 },
+        { date: '2025-08-04', revenue: 2780 },
+        { date: '2025-08-05', revenue: 1890 },
+        { date: '2025-08-06', revenue: 2390 }
+      ],
+      installationRequests: [
+        { date: '2025-08-01', count: 24 },
+        { date: '2025-08-02', count: 13 },
+        { date: '2025-08-03', count: 98 },
+        { date: '2025-08-04', count: 39 },
+        { date: '2025-08-05', count: 48 },
+        { date: '2025-08-06', count: 38 }
+      ]
     }
   });
 
@@ -209,18 +314,15 @@ export default function DashboardScreen() {
     });
   };
 
-
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: () => (
         <View style={styles.headerContainer}>
           <View style={styles.headerTitleContainer}>
-            <Text
-              style={styles.headerTitle}
-            >
-              {user?.role === UserRole.ADMIN ? 'ADMIN DASHBOARD' :
-                user?.role === UserRole.FRANCHISE_OWNER ? 'FRANCHISE DASHBOARD' :
-                  'SERVICE DASHBOARD'}
+            <Text style={styles.headerTitle}>
+              {user?.role === UserRole.ADMIN ? 'ADMIN ' :
+                user?.role === UserRole.FRANCHISE_OWNER ? 'FRANCHISE ' :
+                  'AGENT '}
             </Text>
             <TouchableOpacity
               onPress={openDateRangeSheet}
@@ -236,52 +338,28 @@ export default function DashboardScreen() {
       ),
       headerTitleAlign: 'left',
       headerShadowVisible: false
-      // headerShadowVisible: false,
-      // headerTitle: () => (
-      //   <View style={styles.headerContainer}>
-      //     <View style={styles.headerTitleContainer}>
-      //       <Text style={styles.headerTitle}>
-      //         {user?.role === UserRole.ADMIN ? 'ADMIN DASHBOARD' :
-      //           user?.role === UserRole.FRANCHISE_OWNER ? 'FRANCHISE DASHBOARD' :
-      //             'SERVICE DASHBOARD'}
-      //       </Text>
-      //       {/* <TouchableOpacity
-      //         onPress={openDateRangeSheet}
-      //         style={styles.headerDateContainer}
-      //       >
-      //         <Text style={styles.headerDateText}>
-      //           {startDate.toLocaleDateString()} - {endDate.toLocaleDateString()}
-      //         </Text>
-      //         <Edit3 size={16} color="#007bff" style={styles.headerDateIcon} />
-      //       </TouchableOpacity> */}
-      //     </View>
-      //   </View>
-      // ),
-      // headerTitleAlign: 'left',
     });
   }, [navigation, startDate, endDate, user?.role]);
-
 
   const handleDateRangeSelect = (newStartDate: Date, newEndDate: Date) => {
     setStartDate(newStartDate);
     setEndDate(newEndDate);
   };
 
-
-  // Get tabs based on user role - Generalized structure
+  // Get tabs based on user role
   const getTabs = () => {
     switch (user?.role) {
       case UserRole.ADMIN:
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
           { key: 'trends', title: 'Trends', icon: BarChart3 },
-          { key: 'finance', title: 'Finance', icon: DollarSign }
+          { key: 'analytics', title: 'Analytics', icon: DollarSign }
         ];
       case UserRole.FRANCHISE_OWNER:
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
           { key: 'trends', title: 'Trends', icon: BarChart3 },
-          { key: 'finance', title: 'Finance', icon: DollarSign }
+          { key: 'performance', title: 'Performance', icon: TrendingUp }
         ];
       case UserRole.SERVICE_AGENT:
         return [
@@ -307,6 +385,14 @@ export default function DashboardScreen() {
       );
     }
 
+    if (!dashboardData) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>No data available</Text>
+        </View>
+      );
+    }
+
     if (userRole === UserRole.ADMIN) {
       return renderAdminContent();
     } else if (userRole === UserRole.FRANCHISE_OWNER) {
@@ -319,7 +405,7 @@ export default function DashboardScreen() {
   };
 
   const renderAdminContent = () => {
-    const data = dashboardData || getMockDashboardData();
+    const { stats, pieCharts, timeSeriesData } = dashboardData;
 
     switch (activeTab) {
       case 'overview':
@@ -329,17 +415,16 @@ export default function DashboardScreen() {
             <View style={styles.statsGrid}>
               <StatCard
                 title="Total Revenue"
-                value={`₹${(data.overview.totalRevenue.value / 100000).toFixed(1)}L`}
+                value={formatCurrency(stats.revenue || 0)}
                 icon={DollarSign}
-                trend={data.overview.totalRevenue.trend}
+                trend={formatTrend(stats.revenueChange)}
                 color="#10B981"
                 onPress={() => router.push('/finance')}
               />
               <StatCard
                 title="Active Franchises"
-                value={data.overview.activeFranchises.value.toString()}
+                value={(stats.totalFranchises || 0).toString()}
                 icon={MapPin}
-                trend={data.overview.activeFranchises.trend}
                 color="#007bff"
                 onPress={() => router.push({
                   pathname: '/manage',
@@ -347,20 +432,50 @@ export default function DashboardScreen() {
                 })}
               />
               <StatCard
-                title="Total Orders"
-                value={data.overview.totalOrders.value.toString()}
+                title="Installation Requests"
+                value={(stats.totalInstallationRequests || 0).toString()}
                 icon={Package}
-                trend={data.overview.totalOrders.trend}
+                trend={formatTrend(stats.installationRequestsChange)}
                 color="#F59E0B"
                 onPress={() => router.push('/orders')}
               />
               <StatCard
                 title="Service Requests"
-                value={data.overview.serviceRequests.value.toString()}
+                value={(stats?.totalServiceRequests || 0).toString()}
                 icon={Wrench}
-                trend={data.overview.serviceRequests.trend}
+                trend={formatTrend(stats.serviceRequestsChange)}
                 color="#EF4444"
                 onPress={() => router.push('/service')}
+              />
+            </View>
+
+            {/* Additional Stats */}
+            <View style={styles.statsGrid}>
+              <StatCard
+                title="Total Customers"
+                value={(stats.totalCustomers || 0).toString()}
+                icon={Users}
+                trend={formatTrend(stats.customersChange)}
+                color="#8B5CF6"
+              />
+              <StatCard
+                title="Active Subscriptions"
+                value={(stats.activeSubscriptions || 0).toString()}
+                icon={Activity}
+                trend={formatTrend(stats.subscriptionsChange)}
+                color="#06B6D4"
+              />
+              <StatCard
+                title="Service Agents"
+                value={(stats.totalServiceAgents || 0).toString()}
+                icon={Users}
+                color="#F97316"
+              />
+              <StatCard
+                title="Completed Installs"
+                value={(stats.completedInstallationRequests || 0).toString()}
+                icon={TrendingUp}
+                color="#10B981"
               />
             </View>
 
@@ -383,7 +498,7 @@ export default function DashboardScreen() {
                   subtitle="Performance insights"
                   icon={TrendingUp}
                   color="#10B981"
-                  onPress={() => setActiveTab('trends')}
+                  onPress={() => setActiveTab('analytics')}
                 />
               </View>
             </View>
@@ -393,68 +508,100 @@ export default function DashboardScreen() {
       case 'trends':
         return (
           <View style={styles.contentContainer}>
-            {/* Charts Section */}
             <View style={styles.chartsSection}>
-              <DistributionPieChart
-                data={data.trends.orderDistribution}
-                title="Order Distribution"
-                height={200}
-              />
-              <View style={styles.chartSpacing} />
-              <ComparisonLineChart
-                data={data.trends.revenueOrdersTrend}
-                title="Revenue & Orders Trend"
-                height={220}
-              />
-              <View style={styles.chartSpacing} />
-              <ComparisonBarChart
-                data={data.trends.performanceByCategory}
-                title="Performance by Category"
-                height={220}
-              />
+              {/* Users by Role */}
+              {pieCharts.usersByRole && (
+                <>
+                  <DistributionPieChart
+                    data={transformPieChartData(pieCharts.usersByRole, 'count', 'role')}
+                    title="Users by Role"
+                    height={200}
+                  />
+                  <View style={styles.chartSpacing} />
+                </>
+              )}
+
+              {/* Installation Requests Status */}
+              {pieCharts.installationRequestsByStatus && (
+                <>
+                  <DistributionPieChart
+                    data={transformPieChartData(pieCharts.installationRequestsByStatus, 'count', 'status')}
+                    title="Installation Requests"
+                    height={200}
+                  />
+                  <View style={styles.chartSpacing} />
+                </>
+              )}
+
+              {/* Time Series Charts */}
+              {timeSeriesData && (
+                <>
+                  <ComparisonLineChart
+                    data={transformTimeSeriesData(timeSeriesData)}
+                    title="Trends Over Time"
+                    height={220}
+                  />
+                  <View style={styles.chartSpacing} />
+                </>
+              )}
             </View>
           </View>
         );
 
-      case 'finance':
+      case 'analytics':
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
               <StatCard
-                title="Total Income"
-                value={`₹${(data.finance.totalIncome.value / 100000).toFixed(1)}L`}
+                title="Total Revenue"
+                value={formatCurrency(stats.revenue || 0)}
                 icon={DollarSign}
-                trend={data.finance.totalIncome.trend}
+                trend={formatTrend(stats.revenueChange)}
                 color="#10B981"
               />
               <StatCard
-                title="Expenses"
-                value={`₹${(data.finance.expenses.value / 100000).toFixed(1)}L`}
-                icon={DollarSign}
-                trend={data.finance.expenses.trend}
-                color="#EF4444"
-              />
-              <StatCard
-                title="Net Profit"
-                value={`₹${(data.finance.netProfit.value / 100000).toFixed(1)}L`}
+                title="Revenue Growth"
+                value={`${stats.revenueChange || 0}%`}
                 icon={TrendingUp}
-                trend={data.finance.netProfit.trend}
                 color="#007bff"
               />
               <StatCard
-                title="Franchise Revenue"
-                value={`₹${(data.finance.franchiseRevenue.value / 100000).toFixed(1)}L`}
-                icon={MapPin}
-                trend={data.finance.franchiseRevenue.trend}
+                title="Customer Growth"
+                value={`${stats.customersChange || 0}%`}
+                icon={Users}
                 color="#F59E0B"
               />
+              <StatCard
+                title="Service Efficiency"
+                value={`${Math.round(((stats.completedServiceRequests || 0) / (stats?.totalServiceRequests || 1)) * 100)}%`}
+                icon={Activity}
+                color="#8B5CF6"
+              />
             </View>
-            <View style={styles.chartSpacing} />
-            <ComparisonLineChart
-              data={data.trends.revenueOrdersTrend}
-              title="Financial Trends"
-              height={220}
-            />
+
+            {/* Service Requests Distribution */}
+            {pieCharts.serviceRequestsByStatus && (
+              <>
+                <View style={styles.chartSpacing} />
+                <DistributionPieChart
+                  data={transformPieChartData(pieCharts.serviceRequestsByStatus, 'count', 'status')}
+                  title="Service Requests Status"
+                  height={200}
+                />
+              </>
+            )}
+
+            {/* Subscription Status */}
+            {pieCharts.subscriptionsByStatus && (
+              <>
+                <View style={styles.chartSpacing} />
+                <DistributionPieChart
+                  data={transformPieChartData(pieCharts.subscriptionsByStatus, 'count', 'status')}
+                  title="Subscription Status"
+                  height={200}
+                />
+              </>
+            )}
           </View>
         );
 
@@ -464,40 +611,75 @@ export default function DashboardScreen() {
   };
 
   const renderFranchiseContent = () => {
-    const data = dashboardData || getMockDashboardData();
+    const { stats, pieCharts, timeSeriesData, franchiseInfo } = dashboardData;
 
     switch (activeTab) {
       case 'overview':
         return (
           <View style={styles.contentContainer}>
+            {/* Franchise Info */}
+            {franchiseInfo && (
+              <View style={styles.franchiseInfoCard}>
+                <Text style={styles.franchiseTitle}>{franchiseInfo.name}</Text>
+                <Text style={styles.franchiseCity}>{franchiseInfo.city}</Text>
+              </View>
+            )}
+
             <View style={styles.statsGrid}>
               <StatCard
-                title="Monthly Revenue"
-                value={`₹${(data.overview.monthlyRevenue.value / 1000).toFixed(0)}K`}
+                title="Revenue"
+                value={formatCurrency(stats.revenue || 0)}
                 icon={DollarSign}
-                trend={data.overview.monthlyRevenue.trend}
+                trend={formatTrend(stats.revenueChange)}
                 color="#10B981"
               />
               <StatCard
-                title="Active Orders"
-                value={data.overview.activeOrders.value.toString()}
+                title="Installation Requests"
+                value={(stats.totalInstallationRequests || 0).toString()}
                 icon={Package}
-                trend={data.overview.activeOrders.trend}
+                trend={formatTrend(stats.installationRequestsChange)}
                 color="#007bff"
               />
               <StatCard
-                title="New Customers"
-                value={data.overview.newCustomers.value.toString()}
+                title="Customers"
+                value={(stats.totalCustomers || 0).toString()}
                 icon={Users}
-                trend={data.overview.newCustomers.trend}
                 color="#F59E0B"
               />
               <StatCard
-                title="Service Tasks"
-                value={data.overview.serviceTasks.value.toString()}
+                title="Service Requests"
+                value={(stats?.totalServiceRequests || 0).toString()}
                 icon={Wrench}
-                trend={data.overview.serviceTasks.trend}
+                trend={formatTrend(stats.serviceRequestsChange)}
                 color="#EF4444"
+              />
+            </View>
+
+            <View style={styles.statsGrid}>
+              <StatCard
+                title="Active Subscriptions"
+                value={(stats.activeSubscriptions || 0).toString()}
+                icon={Activity}
+                color="#8B5CF6"
+              />
+              <StatCard
+                title="Completed Installs"
+                value={(stats.completedInstallationRequests || 0).toString()}
+                icon={TrendingUp}
+                color="#10B981"
+              />
+              <StatCard
+                title="Cancel Requests"
+                value={(stats.cancelSubscriptionRequestsActive || 0).toString()}
+                icon={Bell}
+                color="#EF4444"
+              />
+              <StatCard
+                title="Total Subscriptions"
+                value={(stats.totalSubscriptions || 0).toString()}
+                icon={Package}
+                trend={formatTrend(stats.subscriptionsChange)}
+                color="#06B6D4"
               />
             </View>
 
@@ -515,8 +697,8 @@ export default function DashboardScreen() {
                   })}
                 />
                 <QuickActionCard
-                  title="Order Management"
-                  subtitle="Track all orders"
+                  title="Installation Tracking"
+                  subtitle="Track installations"
                   icon={Package}
                   color="#10B981"
                   onPress={() => router.push('/orders')}
@@ -530,69 +712,83 @@ export default function DashboardScreen() {
         return (
           <View style={styles.contentContainer}>
             <View style={styles.chartsSection}>
-              <DistributionPieChart
-                data={data.trends.orderDistribution}
-                title="Customer Distribution"
-                height={200}
-              />
-              <View style={styles.chartSpacing} />
-              <ComparisonLineChart
-                data={data.trends.revenueOrdersTrend}
-                title="Franchise Performance"
-                height={220}
-              />
-              <View style={styles.chartSpacing} />
-              <ComparisonBarChart
-                data={data.trends.performanceByCategory}
-                title="Service Categories"
-                height={220}
-              />
+              {/* Installation Status */}
+              {pieCharts.installationRequestsByStatus && (
+                <>
+                  <DistributionPieChart
+                    data={transformPieChartData(pieCharts.installationRequestsByStatus, 'count', 'status')}
+                    title="Installation Status"
+                    height={200}
+                  />
+                  <View style={styles.chartSpacing} />
+                </>
+              )}
+
+              {/* Service Requests */}
+              {pieCharts.serviceRequestsByStatus && (
+                <>
+                  <DistributionPieChart
+                    data={transformPieChartData(pieCharts.serviceRequestsByStatus, 'count', 'status')}
+                    title="Service Requests"
+                    height={200}
+                  />
+                  <View style={styles.chartSpacing} />
+                </>
+              )}
+
+              {/* Time Series */}
+              {timeSeriesData && (
+                <ComparisonLineChart
+                  data={transformTimeSeriesData(timeSeriesData)}
+                  title="Franchise Performance"
+                  height={220}
+                />
+              )}
             </View>
           </View>
         );
 
-      case 'finance':
+      case 'performance':
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
               <StatCard
-                title="Total Orders"
-                value="156"
+                title="Installation Rate"
+                value={`${Math.round(((stats.completedInstallationRequests || 0) / (stats.totalInstallationRequests || 1)) * 100)}%`}
                 icon={Package}
-              />
-              <StatCard
-                title="Order Revenue"
-                value={`₹${(data.finance.orderRevenue.value / 1000).toFixed(0)}K`}
-                icon={DollarSign}
-                trend={data.finance.orderRevenue.trend}
                 color="#10B981"
               />
               <StatCard
-                title="Service Revenue"
-                value={`₹${(data.finance.serviceRevenue.value / 1000).toFixed(0)}K`}
+                title="Service Rate"
+                value={`${Math.round(((stats.completedServiceRequests || 0) / (stats?.totalServiceRequests || 1)) * 100)}%`}
                 icon={Wrench}
-                trend={data.finance.serviceRevenue.trend}
-                color="#8B5CF6"
+                color="#007bff"
               />
               <StatCard
-                title="Monthly Growth"
-                value={`+${data.finance.monthlyGrowth.value}%`}
-                icon={TrendingUp}
-                trend={data.finance.monthlyGrowth.trend}
+                title="Customer Retention"
+                value={`${Math.round(((stats.activeSubscriptions || 0) / (stats.totalSubscriptions || 1)) * 100)}%`}
+                icon={Users}
                 color="#F59E0B"
               />
+              <StatCard
+                title="Revenue Growth"
+                value={`${stats.revenueChange || 0}%`}
+                icon={TrendingUp}
+                color="#8B5CF6"
+              />
             </View>
-            <ComparisonLineChart
-              data={data.trends.revenueOrdersTrend}
-              title="Revenue Trends"
-              height={220}
-            />
-            <View style={styles.chartSpacing} />
-            <ComparisonBarChart
-              data={data.trends.performanceByCategory}
-              title="Revenue Sources"
-              height={220}
-            />
+
+            {/* Subscription Status */}
+            {pieCharts.subscriptionsByStatus && (
+              <>
+                <View style={styles.chartSpacing} />
+                <DistributionPieChart
+                  data={transformPieChartData(pieCharts.subscriptionsByStatus, 'count', 'status')}
+                  title="Subscription Distribution"
+                  height={200}
+                />
+              </>
+            )}
           </View>
         );
 
@@ -602,7 +798,7 @@ export default function DashboardScreen() {
   };
 
   const renderServiceAgentContent = () => {
-    const data = dashboardData || getMockDashboardData();
+    const { stats, pieCharts, timeSeriesData, upcomingRequests } = dashboardData;
 
     switch (activeTab) {
       case 'overview':
@@ -610,28 +806,45 @@ export default function DashboardScreen() {
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
               <StatCard
-                title="Today's Tasks"
-                value={data.overview.todaysTasks.value.toString()}
+                title="Total Requests"
+                value={(stats?.totalServiceRequests || 0).toString()}
                 icon={Wrench}
+                trend={formatTrend(stats.serviceRequestsChange)}
                 color="#007bff"
               />
               <StatCard
+                title="Assigned"
+                value={(stats.assignedServiceRequests || 0).toString()}
+                icon={Activity}
+                color="#F59E0B"
+              />
+              <StatCard
                 title="Completed"
-                value={data.overview.completedTasks.value.toString()}
+                value={(stats.completedServiceRequests || 0).toString()}
+                icon={TrendingUp}
+                trend={formatTrend(stats.completedRequestsChange)}
+                color="#10B981"
+              />
+
+
+              <StatCard
+                title="Scheduled"
+                value={(stats.scheduledServiceRequests || 0).toString()}
+                icon={Calendar}
+                color="#06B6D4"
+              />
+
+              <StatCard
+                title="Completion Rate"
+                value={`${Math.round(((stats.completedServiceRequests || 0) / (stats?.totalServiceRequests || 1)) * 100)}%`}
                 icon={Activity}
                 color="#10B981"
               />
               <StatCard
-                title="Pending"
-                value={data.overview.pendingTasks.value.toString()}
-                icon={Calendar}
-                color="#F59E0B"
-              />
-              <StatCard
-                title="This Week"
-                value={data.overview.weeklyTasks.value.toString()}
+                title="Weekly Target"
+                value="20"
                 icon={TrendingUp}
-                color="#8B5CF6"
+                color="#EF4444"
               />
             </View>
 
@@ -639,18 +852,18 @@ export default function DashboardScreen() {
               <Text style={styles.sectionTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
                 <QuickActionCard
-                  title="View Tasks"
+                  title="View Requests"
                   subtitle="Check assigned work"
                   icon={Wrench}
                   color="#007bff"
                   onPress={() => router.push('/service')}
                 />
                 <QuickActionCard
-                  title="Check Orders"
-                  subtitle="View order status"
-                  icon={Package}
+                  title="Today's Schedule"
+                  subtitle="View today's tasks"
+                  icon={Calendar}
                   color="#10B981"
-                  onPress={() => router.push('/orders')}
+                  onPress={() => router.push('/schedule')}
                 />
               </View>
             </View>
@@ -661,17 +874,38 @@ export default function DashboardScreen() {
         return (
           <View style={styles.contentContainer}>
             <View style={styles.chartsSection}>
-              <DistributionPieChart
-                data={data.trends.orderDistribution}
-                title="Task Distribution"
-                height={200}
-              />
-              <View style={styles.chartSpacing} />
-              <ComparisonLineChart
-                data={data.trends.revenueOrdersTrend}
-                title="Weekly Performance"
-                height={220}
-              />
+              {/* Service Requests by Status */}
+              {pieCharts.serviceRequestsByStatus && (
+                <>
+                  <DistributionPieChart
+                    data={transformPieChartData(pieCharts.serviceRequestsByStatus, 'count', 'status')}
+                    title="Service Requests Status"
+                    height={200}
+                  />
+                  <View style={styles.chartSpacing} />
+                </>
+              )}
+
+              {/* Service Requests by Type */}
+              {pieCharts.serviceRequestsByType && (
+                <>
+                  <DistributionPieChart
+                    data={transformPieChartData(pieCharts.serviceRequestsByType, 'count', 'type')}
+                    title="Service Requests by Type"
+                    height={200}
+                  />
+                  <View style={styles.chartSpacing} />
+                </>
+              )}
+
+              {/* Daily Completions Trend */}
+              {timeSeriesData && timeSeriesData.dailyCompletions && timeSeriesData.dailyCompletions.length > 0 && (
+                <ComparisonLineChart
+                  data={transformTimeSeriesData(timeSeriesData)}
+                  title="Daily Performance"
+                  height={220}
+                />
+              )}
             </View>
           </View>
         );
@@ -680,11 +914,49 @@ export default function DashboardScreen() {
         return (
           <View style={styles.contentContainer}>
             <View style={styles.statsGrid}>
-              <StatCard title="All Tasks" value="45" icon={Wrench} />
-              <StatCard title="In Progress" value="8" icon={Activity} />
-              <StatCard title="Overdue" value="2" icon={Bell} />
-              <StatCard title="Completed" value="35" icon={TrendingUp} />
+              <StatCard
+                title="All Tasks"
+                value={(stats?.totalServiceRequests || 0).toString()}
+                icon={Wrench}
+                color="#007bff"
+              />
+              <StatCard
+                title="In Progress"
+                value={(stats.inProgressServiceRequests || 0).toString()}
+                icon={Activity}
+                color="#F59E0B"
+              />
+              <StatCard
+                title="Scheduled"
+                value={(stats.scheduledServiceRequests || 0).toString()}
+                icon={Calendar}
+                color="#06B6D4"
+              />
+              <StatCard
+                title="Completed"
+                value={(stats.completedServiceRequests || 0).toString()}
+                icon={TrendingUp}
+                color="#10B981"
+              />
             </View>
+
+            {/* Upcoming Requests */}
+            {upcomingRequests && upcomingRequests.length > 0 && (
+              <View style={styles.upcomingSection}>
+                <Text style={styles.sectionTitle}>Upcoming Requests</Text>
+                {upcomingRequests.slice(0, 3).map((request, index) => (
+                  <View key={index} style={styles.upcomingCard}>
+                    <View style={styles.upcomingHeader}>
+                      <Text style={styles.upcomingTitle}>{request.type || 'Service Request'}</Text>
+                      <Text style={styles.upcomingTime}>{request.scheduledTime || 'TBD'}</Text>
+                    </View>
+                    <Text style={styles.upcomingDescription}>
+                      {request.description || 'Service request details'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
 
             <View style={styles.quickActionsSection}>
               <Text style={styles.sectionTitle}>Task Management</Text>
@@ -724,6 +996,7 @@ export default function DashboardScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabScrollContent}
         >
+
           {tabs.map((tab) => (
             <DashboardTab
               key={tab.key}
@@ -733,6 +1006,7 @@ export default function DashboardScreen() {
               onPress={() => setActiveTab(tab.key)}
             />
           ))}
+
         </ScrollView>
       </View>
 
@@ -742,8 +1016,13 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.dashboardContentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {renderDashboardContent()}
+        <TouchableWithoutFeedback>
+          <View style={{}}>
+            {renderDashboardContent()}
+          </View>
+        </TouchableWithoutFeedback>
       </ScrollView>
+
     </View>
   );
 }
@@ -763,7 +1042,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // flex: 1,
   },
   headerTitle: {
     color: '#111618',
@@ -847,6 +1125,28 @@ const styles = StyleSheet.create({
     fontFamily: 'Outfit_500Medium',
     color: '#6B7280',
     marginTop: 16,
+  },
+  franchiseInfoCard: {
+    backgroundColor: 'white',
+    padding: 16,
+    marginBottom: 20,
+    borderRadius: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  franchiseTitle: {
+    fontSize: 18,
+    fontFamily: 'Outfit_700Bold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  franchiseCity: {
+    fontSize: 14,
+    color: '#64748b',
+    fontFamily: 'Outfit_500Medium',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -953,6 +1253,44 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   quickActionSubtitle: {
+    fontSize: 12,
+    color: '#64748b',
+    fontFamily: 'Outfit_400Regular',
+  },
+  upcomingSection: {
+    marginBottom: 20,
+  },
+  upcomingCard: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#007bff',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  upcomingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  upcomingTitle: {
+    fontSize: 14,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#1e293b',
+    flex: 1,
+  },
+  upcomingTime: {
+    fontSize: 12,
+    color: '#007bff',
+    fontFamily: 'Outfit_500Medium',
+  },
+  upcomingDescription: {
     fontSize: 12,
     color: '#64748b',
     fontFamily: 'Outfit_400Regular',

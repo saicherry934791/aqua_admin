@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
   Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import ActionSheet, { ActionSheetRef } from 'react-native-actions-sheet';
@@ -129,17 +130,17 @@ export const InstallationRequestDetailsScreen = () => {
     setLoading(true);
     try {
       const result = await apiService.get(`/installation-requests/${id}`);
-      
+
       if (result.success && result.data) {
-        console.log('result.data.installationRequest ',result.data.installationRequest)
+        console.log('result.data.installationRequest ', result.data.installationRequest)
         setRequest(result.data.installationRequest);
-        
+
         // Check if payment status is available
         if (result.data.paymentStatus) {
           setPaymentStatus({
             status: result.data.paymentStatus.status || 'PENDING',
-            amount: result.data.installationRequest.orderType === 'RENTAL' 
-              ? result.data.installationRequest.product.deposit || 0 
+            amount: result.data.installationRequest.orderType === 'RENTAL'
+              ? result.data.installationRequest.product.deposit || 0
               : result.data.installationRequest.product.buyPrice || 0,
             method: result.data.paymentStatus.method,
             paidDate: result.data.paymentStatus.paidDate,
@@ -193,10 +194,10 @@ export const InstallationRequestDetailsScreen = () => {
         ...(comment && { comment }),
         ...additionalData
       };
-      console.log('payload ',payload)
+      console.log('payload ', payload)
 
       const result = await apiService.patch(`/installation-requests/${id}/status`, payload);
-      console.log('status update ',result)
+      console.log('status update ', result)
 
       await fetchRequestDetails();
       statusActionSheetRef.current?.hide();
@@ -282,36 +283,14 @@ export const InstallationRequestDetailsScreen = () => {
 
 
   // Get available status transitions based on current status
-  const getAvailableStatusTransitions = (currentStatus: InstallationStatus) => {
-    switch (currentStatus) {
-      case InstallationStatus.SUBMITTED:
-        return [
-          InstallationStatus.FRANCHISE_CONTACTED,
-          InstallationStatus.REJECTED
-        ];
-      case InstallationStatus.FRANCHISE_CONTACTED:
-        return [
-          InstallationStatus.INSTALLATION_SCHEDULED,
-          InstallationStatus.CANCELLED
-        ];
-      case InstallationStatus.INSTALLATION_SCHEDULED:
-        return [
-          InstallationStatus.INSTALLATION_IN_PROGRESS,
-          InstallationStatus.CANCELLED
-        ];
-      case InstallationStatus.INSTALLATION_IN_PROGRESS:
-        return [
-          InstallationStatus.INSTALLATION_COMPLETED,
-          InstallationStatus.CANCELLED
-        ];
-      case InstallationStatus.CANCELLED:
-        return [
-          InstallationStatus.FRANCHISE_CONTACTED,
-          InstallationStatus.INSTALLATION_SCHEDULED,
-          InstallationStatus.INSTALLATION_IN_PROGRESS
-        ];
-      default:
-        return [];
+  const getAvailableStatusTransitions = (status) => {
+    switch (status) {
+      case 'SUBMITTED': return ['FRANCHISE_CONTACTED', 'REJECTED'];
+      case 'FRANCHISE_CONTACTED': return ['INSTALLATION_SCHEDULED', 'CANCELLED'];
+      case 'INSTALLATION_SCHEDULED': return []; // Hide dropdown when scheduled
+      case 'INSTALLATION_IN_PROGRESS': return ['INSTALLATION_COMPLETED', 'CANCELLED'];
+      case 'CANCELLED': return ['FRANCHISE_CONTACTED', 'INSTALLATION_SCHEDULED', 'INSTALLATION_IN_PROGRESS'];
+      default: return [];
     }
   };
 
@@ -370,7 +349,7 @@ export const InstallationRequestDetailsScreen = () => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
     }
-    
+
     if (selectedDate) {
       setScheduledDate(selectedDate);
       if (Platform.OS === 'android') {
@@ -382,7 +361,7 @@ export const InstallationRequestDetailsScreen = () => {
 
   const handleTimeChange = (event: any, selectedTime?: Date) => {
     setShowTimePicker(false);
-    
+
     if (selectedTime) {
       const newDateTime = new Date(scheduledDate);
       newDateTime.setHours(selectedTime.getHours());
@@ -395,7 +374,7 @@ export const InstallationRequestDetailsScreen = () => {
     return request.orderType === 'RENTAL' ? request.product?.rentPrice : request.product?.buyPrice;
   };
 
-  console.log('user is installation request is ',user)
+  console.log('user is installation request is ', user)
 
   const getActionTypeDisplayName = (actionType: string) => {
     switch (actionType) {
@@ -440,378 +419,406 @@ export const InstallationRequestDetailsScreen = () => {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Request Summary Card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.requestHeader}>
-            <View style={styles.requestInfo}>
-              <Text style={styles.requestId}>#{request.id?.slice(-6)?.toUpperCase()}</Text>
-              <View style={[styles.orderTypeBadge, {
-                backgroundColor: request.orderType === 'RENTAL' ? '#ECFDF5' : '#FFFBEB'
-              }]}>
-                <Text style={[styles.orderTypeText, {
-                  color: request.orderType === 'RENTAL' ? '#047857' : '#92400E'
-                }]}>
-                  {request.orderType}
-                </Text>
+        <TouchableWithoutFeedback>
+          <View style={{}}>
+            <View style={styles.summaryCard}>
+              <View style={styles.requestHeader}>
+                <View style={styles.requestInfo}>
+                  <Text style={styles.requestId}>#{request.id?.slice(-6)?.toUpperCase()}</Text>
+                  <View style={[styles.orderTypeBadge, {
+                    backgroundColor: request.orderType === 'RENTAL' ? '#ECFDF5' : '#FFFBEB'
+                  }]}>
+                    <Text style={[styles.orderTypeText, {
+                      color: request.orderType === 'RENTAL' ? '#047857' : '#92400E'
+                    }]}>
+                      {request.orderType}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.requestDate}>{formatDate(request.createdAt)}</Text>
               </View>
-            </View>
-            <Text style={styles.requestDate}>{formatDate(request.createdAt)}</Text>
-          </View>
+              <TouchableOpacity
+                style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}
+                onPress={() => availableTransitions.length > 0 && statusActionSheetRef.current?.show()}
+              >
+                <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
+                <Text style={[styles.statusText, { color: statusColors.text }]}>
+                  {getStatusDisplayName(request.status)}
+                </Text>
+                {/* Show dropdown only if transitions exist */}
+                {availableTransitions.length > 0 && (
+                  <Ionicons name="chevron-down" size={12} color={statusColors.text} />
+                )}
+              </TouchableOpacity>
 
-          <TouchableOpacity
+              {/* <TouchableOpacity
             style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}
             onPress={() => user?.role !== UserRole.SERVICE_AGENT ? statusActionSheetRef.current?.show() : undefined}
           >
-            <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
+            <View  style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
             <Text style={[styles.statusText, { color: statusColors.text }]}>
               {getStatusDisplayName(request.status)}
             </Text>
             {user?.role !== UserRole.SERVICE_AGENT && availableTransitions.length > 0 && (
               <Ionicons name="chevron-down" size={12} color={statusColors.text} />
             )}
-          </TouchableOpacity>
-           
-          {/* Quick Actions */}
-          {user?.role !== UserRole.SERVICE_AGENT && (
-            <View style={styles.quickActions}>
-              {request.status === InstallationStatus.SUBMITTED && (
-                <>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleStatusUpdate(InstallationStatus.FRANCHISE_CONTACTED)}
-                  >
-                    <Ionicons name="call" size={16} color="#3B82F6" />
-                    <Text style={styles.actionButtonText}>Contact Franchise</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.dangerActionButton]}
-                    onPress={() => rejectActionSheetRef.current?.show()}
-                  >
-                    <Ionicons name="close" size={16} color="#EF4444" />
-                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Reject</Text>
-                  </TouchableOpacity>
-                </>
-              )}
+          </TouchableOpacity> */}
 
-              {request.status === InstallationStatus.FRANCHISE_CONTACTED && (
-                <>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => agentActionSheetRef.current?.show()}
-                  >
-                    <Ionicons name="person-add" size={16} color="#10B981" />
-                    <Text style={styles.actionButtonText}>Schedule Installation</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.dangerActionButton]}
-                    onPress={() => cancelActionSheetRef.current?.show()}
-                  >
-                    <Ionicons name="close-circle" size={16} color="#EF4444" />
-                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Cancel</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {request.status === InstallationStatus.INSTALLATION_SCHEDULED && (
-                <>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleStatusUpdate(InstallationStatus.INSTALLATION_IN_PROGRESS)}
-                  >
-                    <Ionicons name="construct" size={16} color="#F59E0B" />
-                    <Text style={styles.actionButtonText}>Start Installation</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.dangerActionButton]}
-                    onPress={() => cancelActionSheetRef.current?.show()}
-                  >
-                    <Ionicons name="close-circle" size={16} color="#EF4444" />
-                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Cancel</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-
-              {request.status === InstallationStatus.INSTALLATION_IN_PROGRESS && (
-                <>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.primaryActionButton]}
-                    onPress={handleCompleteInstallation}
-                  >
-                    <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
-                    <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>Complete Installation</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.dangerActionButton]}
-                    onPress={() => cancelActionSheetRef.current?.show()}
-                  >
-                    <Ionicons name="close-circle" size={16} color="#EF4444" />
-                    <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>Cancel</Text>
-                  </TouchableOpacity>
-                 
-                 
-                </>
-              )}
-
-              {request.status === InstallationStatus.CANCELLED && (
-                <>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleStatusUpdate(InstallationStatus.FRANCHISE_CONTACTED)}
-                  >
-                    <Ionicons name="refresh" size={16} color="#10B981" />
-                    <Text style={styles.actionButtonText}>Reactivate</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => agentActionSheetRef.current?.show()}
-                  >
-                    <Ionicons name="calendar" size={16} color="#F59E0B" />
-                    <Text style={styles.actionButtonText}>Reschedule</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* Product Details */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Product Details</Text>
-          <View style={styles.productSection}>
-            <View style={styles.productInfo}>
-              <Text style={styles.productName}>{request.product?.name}</Text>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>
-                  {request.orderType === 'RENTAL' ? 'Rental Price:' : 'Purchase Price:'}
-                </Text>
-                <Text style={styles.priceValue}>{formatCurrency(getPriceForOrderType(request))}</Text>
-              </View>
-              {request.product?.deposit > 0 && (
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>Deposit:</Text>
-                  <Text style={styles.depositValue}>{formatCurrency(request.product.deposit)}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Customer Details */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Customer Details</Text>
-          <View style={styles.customerSection}>
-            <View style={styles.customerInfo}>
-              <View style={styles.customerNameRow}>
-                <Ionicons name="person" size={20} color="#6B7280" />
-                <Text style={styles.customerName}>{request.customer?.name || request.name}</Text>
-              </View>
-            </View>
-
-            <View style={styles.contactRow}>
-              <View style={styles.contactInfo}>
-                <Ionicons name="call" size={16} color="#6B7280" />
-                <Text style={styles.contactText}>{request.customer?.phone || request.phoneNumber}</Text>
-              </View>
-              <View style={styles.contactActions}>
-                <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={() => handlePhoneCall(request.customer?.phone || request.phoneNumber)}
-                >
-                  <Ionicons name="call" size={16} color="#3B82F6" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={() => handleWhatsApp(request.customer?.phone || request.phoneNumber)}
-                >
-                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.addressInfo}>
-              <Ionicons name="location" size={16} color="#6B7280" />
-              <Text style={styles.addressText}>{request.installationAddress}</Text>
-            </View>
-          </View>
-        </View>
-        
-        {/* Payment Status */}
-        {paymentStatus && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Payment Status</Text>
-            <View style={styles.paymentSection}>
-              <View style={[styles.paymentStatusBadge, {
-                backgroundColor: 
-                  paymentStatus.status === 'COMPLETED' ? '#D1FAE5' :
-                  paymentStatus.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
-              }]}>
-                <View style={[styles.statusDot, { 
-                  backgroundColor: 
-                    paymentStatus.status === 'COMPLETED' ? '#059669' :
-                    paymentStatus.status === 'PENDING' ? '#D97706' : '#DC2626'
-                }]} />
-                <Text style={[styles.paymentStatusText, {
-                  color: 
-                    paymentStatus.status === 'COMPLETED' ? '#047857' :
-                    paymentStatus.status === 'PENDING' ? '#92400E' : '#B91C1C'
-                }]}>
-                  {paymentStatus.status}
-                </Text>
-              </View>
-              
-              <View style={styles.paymentDetails}>
-                <View style={styles.paymentRow}>
-                  <Text style={styles.paymentLabel}>Amount:</Text>
-                  <Text style={styles.paymentValue}>{formatCurrency(paymentStatus.amount)}</Text>
-                </View>
-                
-                {paymentStatus.method && (
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>Method:</Text>
-                    <Text style={styles.paymentValue}>{paymentStatus.method}</Text>
-                  </View>
-                )}
-                
-                {paymentStatus.paidDate && (
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>Paid On:</Text>
-                    <Text style={styles.paymentValue}>{formatDate(paymentStatus.paidDate)}</Text>
-                  </View>
-                )}
-                
-                {paymentStatus.razorpayOrderId && (
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>Order ID:</Text>
-                    <Text style={styles.paymentValue}>{paymentStatus.razorpayOrderId}</Text>
-                  </View>
-                )}
-                
-               
-                
-                {paymentStatus.razorpaySubscriptionId && (
-                  <View style={styles.paymentRow}>
-                    <Text style={styles.paymentLabel}>Subscription ID:</Text>
-                    <Text style={styles.paymentValue}>{paymentStatus.razorpaySubscriptionId}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Franchise Details */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Franchise Details</Text>
-          <View style={styles.franchiseSection}>
-            <View style={styles.franchiseInfo}>
-              <Ionicons name="business" size={20} color="#6B7280" />
-              <View style={styles.franchiseDetails}>
-                <Text style={styles.franchiseName}>{request.franchise?.name}</Text>
-                <Text style={styles.franchiseCity}>{request.franchise?.city}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Assigned Technician */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Assigned Technician</Text>
-            {user?.role !== UserRole.SERVICE_AGENT && request.status === InstallationStatus.FRANCHISE_CONTACTED && (
-              <TouchableOpacity
-                style={styles.assignButton}
-                onPress={() => agentActionSheetRef.current?.show()}
-              >
-                <Ionicons name="person-add" size={14} color="#3B82F6" />
-                <Text style={styles.assignButtonText}>
-                  {request.assignedTechnician ? 'Change' : 'Assign'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {request.assignedTechnician ? (
-            <View style={styles.technicianSection}>
-              <View style={styles.technicianInfo}>
-                <Ionicons name="person-circle" size={20} color="#6B7280" />
-                <Text style={styles.technicianName}>{request.assignedTechnician?.name}</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.noTechnicianSection}>
-              <View style={styles.noTechnicianIcon}>
-                <Ionicons name="person-add" size={24} color="#3B82F6" />
-              </View>
-              <Text style={styles.noTechnicianText}>No technician assigned yet</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Schedule Details */}
-        {request.scheduledDate && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Schedule Details</Text>
-            <View style={styles.scheduleSection}>
-              <View style={styles.scheduleRow}>
-                <Ionicons name="calendar" size={20} color="#F59E0B" />
-                <View style={styles.scheduleInfo}>
-                  <Text style={styles.scheduleLabel}>Scheduled Date</Text>
-                  <Text style={styles.scheduleDate}>{formatDate(request.scheduledDate)}</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Rejection Reason */}
-        {request.rejectionReason && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Rejection Reason</Text>
-            <View style={styles.rejectionSection}>
-              <Ionicons name="warning" size={20} color="#EF4444" />
-              <Text style={styles.rejectionText}>{request.rejectionReason}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Action History */}
-        {request.actionHistory && request.actionHistory.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Action History</Text>
-            <View style={styles.actionHistorySection}>
-              {request.actionHistory.map((action, index) => (
-                <View key={action.id} style={styles.actionHistoryItem}>
-                  <View style={styles.actionHistoryHeader}>
-                    <Text style={styles.actionHistoryAction}>
-                      {getActionTypeDisplayName(action.actionType)}
-                    </Text>
-                    <Text style={styles.actionHistoryDate}>
-                      {formatDate(action.createdAt)}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.actionHistoryDetails}>
-                    <Text style={styles.actionHistoryRole}>
-                      by {action.performedByRole}
-                    </Text>
-                    {action.fromStatus && (
-                      <Text style={styles.actionHistoryStatus}>
-                        {getStatusDisplayName(action.fromStatus as InstallationStatus)} → {getStatusDisplayName(action.toStatus as InstallationStatus)}
+              {/* Quick Actions */}
+              {user?.role !== UserRole.SERVICE_AGENT && (
+                <View>
+                  {request.status === InstallationStatus.INSTALLATION_SCHEDULED ? (
+                    <View style={styles.quickActions}>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.dangerActionButton]}
+                        onPress={() => cancelActionSheetRef.current?.show()}
+                      >
+                        <Ionicons name="close-circle" size={16} color="#EF4444" />
+                        <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+                      <Text style={styles.infoText}>
+                        Remaining should handle in service request
                       </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.quickActions}>
+                      {request.status === InstallationStatus.SUBMITTED && (
+                        <>
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() =>
+                              handleStatusUpdate(InstallationStatus.FRANCHISE_CONTACTED)
+                            }
+                          >
+                            <Ionicons name="call" size={16} color="#3B82F6" />
+                            <Text style={styles.actionButtonText}>Contact Franchise</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.dangerActionButton]}
+                            onPress={() => rejectActionSheetRef.current?.show()}
+                          >
+                            <Ionicons name="close" size={16} color="#EF4444" />
+                            <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>
+                              Reject
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+
+                      {request.status === InstallationStatus.FRANCHISE_CONTACTED && (
+                        <>
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() => agentActionSheetRef.current?.show()}
+                          >
+                            <Ionicons name="person-add" size={16} color="#10B981" />
+                            <Text style={styles.actionButtonText}>Schedule Installation</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.dangerActionButton]}
+                            onPress={() => cancelActionSheetRef.current?.show()}
+                          >
+                            <Ionicons name="close-circle" size={16} color="#EF4444" />
+                            <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>
+                              Cancel
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+
+                      {request.status === InstallationStatus.INSTALLATION_IN_PROGRESS && (
+                        <>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.primaryActionButton]}
+                            onPress={handleCompleteInstallation}
+                          >
+                            <Ionicons name="checkmark-done" size={16} color="#FFFFFF" />
+                            <Text style={[styles.actionButtonText, { color: '#FFFFFF' }]}>
+                              Complete Installation
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionButton, styles.dangerActionButton]}
+                            onPress={() => cancelActionSheetRef.current?.show()}
+                          >
+                            <Ionicons name="close-circle" size={16} color="#EF4444" />
+                            <Text style={[styles.actionButtonText, { color: '#EF4444' }]}>
+                              Cancel
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+
+                      {request.status === InstallationStatus.CANCELLED && (
+                        <>
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() =>
+                              handleStatusUpdate(InstallationStatus.FRANCHISE_CONTACTED)
+                            }
+                          >
+                            <Ionicons name="refresh" size={16} color="#10B981" />
+                            <Text style={styles.actionButtonText}>Reactivate</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.actionButton}
+                            onPress={() => agentActionSheetRef.current?.show()}
+                          >
+                            <Ionicons name="calendar" size={16} color="#F59E0B" />
+                            <Text style={styles.actionButtonText}>Reschedule</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
+
+            </View>
+
+            {/* Product Details */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Product Details</Text>
+              <View style={styles.productSection}>
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName}>{request.product?.name}</Text>
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceLabel}>
+                      {request.orderType === 'RENTAL' ? 'Rental Price:' : 'Purchase Price:'}
+                    </Text>
+                    <Text style={styles.priceValue}>{formatCurrency(getPriceForOrderType(request))}</Text>
+                  </View>
+                  {request.product?.deposit > 0 && (
+                    <View style={styles.priceRow}>
+                      <Text style={styles.priceLabel}>Deposit:</Text>
+                      <Text style={styles.depositValue}>{formatCurrency(request.product.deposit)}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            {/* Customer Details */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Customer Details</Text>
+              <View style={styles.customerSection}>
+                <View style={styles.customerInfo}>
+                  <View style={styles.customerNameRow}>
+                    <Ionicons name="person" size={20} color="#6B7280" />
+                    <Text style={styles.customerName}>{request.customer?.name || request.name}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.contactRow}>
+                  <View style={styles.contactInfo}>
+                    <Ionicons name="call" size={16} color="#6B7280" />
+                    <Text style={styles.contactText}>{request.customer?.phone || request.phoneNumber}</Text>
+                  </View>
+                  <View style={styles.contactActions}>
+                    <TouchableOpacity
+                      style={styles.contactButton}
+                      onPress={() => handlePhoneCall(request.customer?.phone || request.phoneNumber)}
+                    >
+                      <Ionicons name="call" size={16} color="#3B82F6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.contactButton}
+                      onPress={() => handleWhatsApp(request.customer?.phone || request.phoneNumber)}
+                    >
+                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.addressInfo}>
+                  <Ionicons name="location" size={16} color="#6B7280" />
+                  <Text style={styles.addressText}>{request.installationAddress}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Payment Status */}
+            {paymentStatus && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Payment Status</Text>
+                <View style={styles.paymentSection}>
+                  <View style={[styles.paymentStatusBadge, {
+                    backgroundColor:
+                      paymentStatus.status === 'COMPLETED' ? '#D1FAE5' :
+                        paymentStatus.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+                  }]}>
+                    <View style={[styles.statusDot, {
+                      backgroundColor:
+                        paymentStatus.status === 'COMPLETED' ? '#059669' :
+                          paymentStatus.status === 'PENDING' ? '#D97706' : '#DC2626'
+                    }]} />
+                    <Text style={[styles.paymentStatusText, {
+                      color:
+                        paymentStatus.status === 'COMPLETED' ? '#047857' :
+                          paymentStatus.status === 'PENDING' ? '#92400E' : '#B91C1C'
+                    }]}>
+                      {paymentStatus.status}
+                    </Text>
+                  </View>
+
+                  <View style={styles.paymentDetails}>
+                    <View style={styles.paymentRow}>
+                      <Text style={styles.paymentLabel}>Amount:</Text>
+                      <Text style={styles.paymentValue}>{formatCurrency(paymentStatus.amount)}</Text>
+                    </View>
+
+                    {paymentStatus.method && (
+                      <View style={styles.paymentRow}>
+                        <Text style={styles.paymentLabel}>Method:</Text>
+                        <Text style={styles.paymentValue}>{paymentStatus.method}</Text>
+                      </View>
+                    )}
+
+                    {paymentStatus.paidDate && (
+                      <View style={styles.paymentRow}>
+                        <Text style={styles.paymentLabel}>Paid On:</Text>
+                        <Text style={styles.paymentValue}>{formatDate(paymentStatus.paidDate)}</Text>
+                      </View>
+                    )}
+
+                    {paymentStatus.razorpayOrderId && (
+                      <View style={styles.paymentRow}>
+                        <Text style={styles.paymentLabel}>Order ID:</Text>
+                        <Text style={styles.paymentValue}>{paymentStatus.razorpayOrderId}</Text>
+                      </View>
+                    )}
+
+
+
+                    {paymentStatus.razorpaySubscriptionId && (
+                      <View style={styles.paymentRow}>
+                        <Text style={styles.paymentLabel}>Subscription ID:</Text>
+                        <Text style={styles.paymentValue}>{paymentStatus.razorpaySubscriptionId}</Text>
+                      </View>
                     )}
                   </View>
-                  
-                  {action.comment && (
-                    <Text style={styles.actionHistoryComment}>{action.comment}</Text>
-                  )}
-                  
-                  {index < request.actionHistory.length - 1 && (
-                    <View style={styles.actionHistoryDivider} />
-                  )}
                 </View>
-              ))}
+              </View>
+            )}
+
+            {/* Franchise Details */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Franchise Details</Text>
+              <View style={styles.franchiseSection}>
+                <View style={styles.franchiseInfo}>
+                  <Ionicons name="business" size={20} color="#6B7280" />
+                  <View style={styles.franchiseDetails}>
+                    <Text style={styles.franchiseName}>{request.franchise?.name}</Text>
+                    <Text style={styles.franchiseCity}>{request.franchise?.city}</Text>
+                  </View>
+                </View>
+              </View>
             </View>
+
+            {/* Assigned Technician */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Assigned Technician</Text>
+                {user?.role !== UserRole.SERVICE_AGENT && request.status === InstallationStatus.FRANCHISE_CONTACTED && (
+                  <TouchableOpacity
+                    style={styles.assignButton}
+                    onPress={() => agentActionSheetRef.current?.show()}
+                  >
+                    <Ionicons name="person-add" size={14} color="#3B82F6" />
+                    <Text style={styles.assignButtonText}>
+                      {request.assignedTechnician ? 'Change' : 'Assign'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {request.assignedTechnician ? (
+                <View style={styles.technicianSection}>
+                  <View style={styles.technicianInfo}>
+                    <Ionicons name="person-circle" size={20} color="#6B7280" />
+                    <Text style={styles.technicianName}>{request.assignedTechnician?.name}</Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.noTechnicianSection}>
+                  <View style={styles.noTechnicianIcon}>
+                    <Ionicons name="person-add" size={24} color="#3B82F6" />
+                  </View>
+                  <Text style={styles.noTechnicianText}>No technician assigned yet</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Schedule Details */}
+            {request.scheduledDate && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Schedule Details</Text>
+                <View style={styles.scheduleSection}>
+                  <View style={styles.scheduleRow}>
+                    <Ionicons name="calendar" size={20} color="#F59E0B" />
+                    <View style={styles.scheduleInfo}>
+                      <Text style={styles.scheduleLabel}>Scheduled Date</Text>
+                      <Text style={styles.scheduleDate}>{formatDate(request.scheduledDate)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Rejection Reason */}
+            {request.rejectionReason && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Rejection Reason</Text>
+                <View style={styles.rejectionSection}>
+                  <Ionicons name="warning" size={20} color="#EF4444" />
+                  <Text style={styles.rejectionText}>{request.rejectionReason}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Action History */}
+            {request.actionHistory && request.actionHistory.length > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Action History</Text>
+                <View style={styles.actionHistorySection}>
+                  {request.actionHistory.map((action, index) => (
+                    <View key={action.id} style={styles.actionHistoryItem}>
+                      <View style={styles.actionHistoryHeader}>
+                        <Text style={styles.actionHistoryAction}>
+                          {getActionTypeDisplayName(action.actionType)}
+                        </Text>
+                        <Text style={styles.actionHistoryDate}>
+                          {formatDate(action.createdAt)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.actionHistoryDetails}>
+                        <Text style={styles.actionHistoryRole}>
+                          by {action.performedByRole}
+                        </Text>
+                        {action.fromStatus && (
+                          <Text style={styles.actionHistoryStatus}>
+                            {getStatusDisplayName(action.fromStatus as InstallationStatus)} → {getStatusDisplayName(action.toStatus as InstallationStatus)}
+                          </Text>
+                        )}
+                      </View>
+
+                      {action.comment && (
+                        <Text style={styles.actionHistoryComment}>{action.comment}</Text>
+                      )}
+
+                      {index < request.actionHistory.length - 1 && (
+                        <View style={styles.actionHistoryDivider} />
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
-        )}
+        </TouchableWithoutFeedback>
       </ScrollView>
 
       {/* Action Sheets */}
@@ -914,7 +921,7 @@ export const InstallationRequestDetailsScreen = () => {
               onChange={handleTimeChange}
             />
           )}
-         
+
 
           {serviceAgents && serviceAgents.map((agent) => (
             <TouchableOpacity
@@ -928,8 +935,8 @@ export const InstallationRequestDetailsScreen = () => {
               <Ionicons name="person-circle" size={20} color="#374151" />
               <View style={styles.agentOptionInfo}>
                 <Text style={styles.actionSheetOptionText}>{agent.name}</Text>
-                <Text style={styles.agentOptionPhone}>{agent.phone}</Text>
-                <Text style={styles.agentOptionRole}>{agent.role} {agent.isPrimary ? '(Primary)' : ''}</Text>
+                <Text style={{}}>{agent.number}</Text>
+                <Text style={{}}>{agent.role} {agent.isPrimary ? '(Primary)' : ''}</Text>
               </View>
               {request.assignedTechnicianId === agent.id && (
                 <Ionicons name="checkmark" size={20} color="#10B981" />
@@ -1044,6 +1051,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
+    flexGrow: 1
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
@@ -1452,7 +1460,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Outfit_500Medium',
     color: '#374151',
-    flex: 1,
+
   },
   activeOption: {
     backgroundColor: '#F1F5F9',
@@ -1540,5 +1548,12 @@ const styles = StyleSheet.create({
   },
   dangerSubmitButton: {
     backgroundColor: '#EF4444',
+  },
+  infoText: {
+    marginTop: 8,
+    fontSize: 14,
+    fontFamily: 'Outfit_400Regular',
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });

@@ -64,8 +64,8 @@ export const ServiceImageManager: React.FC<ServiceImageManagerProps> = ({
   };
 
   const canAddBeforeImages = () => {
-    return currentStatus === ServiceRequestStatus.SCHEDULED || 
-           currentStatus === ServiceRequestStatus.ASSIGNED;
+    return currentStatus === ServiceRequestStatus.SCHEDULED ||
+      currentStatus === ServiceRequestStatus.ASSIGNED;
   };
 
   const canAddAfterImages = () => {
@@ -73,8 +73,7 @@ export const ServiceImageManager: React.FC<ServiceImageManagerProps> = ({
   };
 
   const requiresBeforeImages = () => {
-    return serviceType === ServiceType.INSTALLATION && 
-           (currentStatus === ServiceRequestStatus.SCHEDULED || currentStatus === ServiceRequestStatus.IN_PROGRESS);
+    return (currentStatus === ServiceRequestStatus.SCHEDULED || currentStatus === ServiceRequestStatus.IN_PROGRESS);
   };
 
   const requiresAfterImages = () => {
@@ -82,8 +81,8 @@ export const ServiceImageManager: React.FC<ServiceImageManagerProps> = ({
   };
 
   const renderImageGrid = (images: string[], type: 'initial' | 'before' | 'after') => {
-    const canRemove = (type === 'before' && canAddBeforeImages()) || 
-                     (type === 'after' && canAddAfterImages());
+    const canRemove = (type === 'before' && canAddBeforeImages()) ||
+      (type === 'after' && canAddAfterImages());
 
     return (
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -110,20 +109,20 @@ export const ServiceImageManager: React.FC<ServiceImageManagerProps> = ({
 
   const renderEmptyState = (type: 'before' | 'after', onPress: () => void, required: boolean) => {
     const isBeforeType = type === 'before';
-    const title = required 
+    const title = required
       ? `${isBeforeType ? 'Before' : 'After'} images required`
       : `Add ${isBeforeType ? 'before' : 'after'} images`;
-    
-    const subtitle = isBeforeType 
+
+    const subtitle = isBeforeType
       ? 'Take photos before starting the service'
       : 'Take photos after completing the service';
 
     return (
       <View style={[styles.noImagesContainer, required && styles.requiredImagesContainer]}>
-        <Ionicons 
-          name="camera" 
-          size={32} 
-          color={required ? '#EF4444' : '#9CA3AF'} 
+        <Ionicons
+          name="camera"
+          size={32}
+          color={required ? '#EF4444' : '#9CA3AF'}
         />
         <Text style={[styles.noImagesTitle, required && styles.requiredImagesTitle]}>
           {title}
@@ -190,32 +189,32 @@ export const ServiceImageManager: React.FC<ServiceImageManagerProps> = ({
         currentStatus === ServiceRequestStatus.PAYMENT_PENDING ||
         currentStatus === ServiceRequestStatus.COMPLETED ||
         afterImages.length > 0) && (
-        <View style={styles.imageSection}>
-          <View style={styles.imageSectionHeader}>
-            <Text style={[
-              styles.imageSectionTitle,
-              requiresAfterImages() && afterImages.length === 0 && styles.requiredSectionTitle
-            ]}>
-              After Service {requiresAfterImages() && afterImages.length === 0 && '*'}
-            </Text>
-            {canAddAfterImages() && afterImages.length > 0 && (
-              <TouchableOpacity
-                style={styles.addImageButton}
-                onPress={() => pickImages('after')}
-              >
-                <Ionicons name="camera" size={16} color="#3B82F6" />
-                <Text style={styles.addImageText}>Add More</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <View style={styles.imageSection}>
+            <View style={styles.imageSectionHeader}>
+              <Text style={[
+                styles.imageSectionTitle,
+                requiresAfterImages() && afterImages.length === 0 && styles.requiredSectionTitle
+              ]}>
+                After Service {requiresAfterImages() && afterImages.length === 0 && '*'}
+              </Text>
+              {canAddAfterImages() && afterImages.length > 0 && (
+                <TouchableOpacity
+                  style={styles.addImageButton}
+                  onPress={() => pickImages('after')}
+                >
+                  <Ionicons name="camera" size={16} color="#3B82F6" />
+                  <Text style={styles.addImageText}>Add More</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-          {afterImages.length > 0 ? (
-            renderImageGrid(afterImages, 'after')
-          ) : canAddAfterImages() ? (
-            renderEmptyState('after', () => pickImages('after'), requiresAfterImages())
-          ) : null}
-        </View>
-      )}
+            {afterImages.length > 0 ? (
+              renderImageGrid(afterImages, 'after')
+            ) : canAddAfterImages() ? (
+              renderEmptyState('after', () => pickImages('after'), requiresAfterImages())
+            ) : null}
+          </View>
+        )}
     </View>
   );
 };

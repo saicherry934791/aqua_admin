@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View
 } from 'react-native';
 
@@ -51,86 +52,15 @@ const OpenServiceRequestsScreen = () => {
         </Text>
       ),
       headerRight: () => <View style={{
-        paddingRight:16
+        paddingRight: 16
       }}><View style={styles.headerBadge}>
-        <Text style={styles.headerBadgeText}>{serviceRequests.length}</Text>
-      </View></View>,
+          <Text style={styles.headerBadgeText}>{serviceRequests.length}</Text>
+        </View></View>,
       headerTitleAlign: 'center',
       headerShadowVisible: false
     });
   }, [navigation]);
 
-  // Mock data for open service requests
-  const mockServiceRequests: ServiceRequest[] = [
-    {
-      id: 'sr-001',
-    
-      description: 'Install new RO water purifier system in kitchen area. Customer has already purchased the unit.',
-      type: 'installation',
-      priority: 'high',
-      status: 'open',
-      createdAt: '2024-06-28T09:30:00Z',
-      customerName: 'Ravi Kumar',
-      customerAddress: 'Flat 204, Silver Heights, Banjara Hills, Hyderabad - 500034',
-      customerPhone: '+91 98765 43210',
-
-    },
-    {
-      id: 'sr-002',
-      
-      description: 'Split AC not cooling properly. Customer reports that it runs but no cold air. Possible refrigerant leak.',
-      type: 'repair',
-      priority: 'urgent',
-      status: 'open',
-      createdAt: '2024-06-28T08:15:00Z',
-      customerName: 'Priya Sharma',
-      customerAddress: 'House 15, Green Valley Colony, Kondapur, Hyderabad - 500084',
-      customerPhone: '+91 87654 32109',
-
-
-    },
-    {
-      id: 'sr-003',
-     
-      description: 'Regular maintenance service for front-load washing machine. Check drum, filters, and perform cleaning cycle.',
-      type: 'maintenance',
-      priority: 'medium',
-      status: 'open',
-      createdAt: '2024-06-28T07:45:00Z',
-      customerName: 'Amit Patel',
-      customerAddress: 'Villa 42, Palm Meadows, Whitefield, Bangalore - 560066',
-      customerPhone: '+91 76543 21098',
-
-
-    },
-    {
-      id: 'sr-004',
-    
-      description: 'Double door refrigerator completely stopped working. No power, compressor not running.',
-      type: 'repair',
-      priority: 'urgent',
-      status: 'open',
-      createdAt: '2024-06-27T16:30:00Z',
-      customerName: 'Sunita Reddy',
-      customerAddress: 'Apt 301, Cyber Towers, HITEC City, Hyderabad - 500081',
-      customerPhone: '+91 65432 10987',
-
-    },
-    {
-      id: 'sr-005',
-   
-      description: 'Annual safety inspection for commercial microwave oven. Check radiation levels and door seals.',
-      type: 'inspection',
-      priority: 'low',
-      status: 'open',
-      createdAt: '2024-06-27T14:20:00Z',
-      customerName: 'Green Cafe Restaurant',
-      customerAddress: 'Shop 12, Food Court, Forum Mall, Kukatpally, Hyderabad - 500072',
-      customerPhone: '+91 54321 09876',
-
-
-    },
-  ];
 
   useEffect(() => {
     fetchServiceRequests();
@@ -139,18 +69,12 @@ const OpenServiceRequestsScreen = () => {
   const fetchServiceRequests = async () => {
     setLoading(true);
     try {
-      // For now, use mock data
-      if (user?.role === UserRole.SERVICE_AGENT) {
-        // Filter only open requests
-        const openRequests = mockServiceRequests.filter(sr => sr.status === 'open');
-        setServiceRequests(openRequests);
-      } else {
-        const result = await apiService.get('/service-requests?status=open');
-        setServiceRequests(result?.data || []);
-      }
+      const result = await apiService.get('/service-requests/unassigned');
+      console.log('result notifications ', result)
+      setServiceRequests(result?.data || []);
     } catch (error) {
       console.log('Failed to fetch service requests:', error);
-      setServiceRequests(mockServiceRequests.filter(sr => sr.status === 'open'));
+
     }
     setLoading(false);
     setRefreshing(false);
@@ -183,23 +107,31 @@ const OpenServiceRequestsScreen = () => {
     setAssigningId(serviceRequestId);
     try {
       // Make API call to assign the service request
-      await apiService.patch(`/service-requests/${serviceRequestId}/assign`, {
-        technicianId: user?.id,
+      const resp = await apiService.post(`/service-requests/${serviceRequestId}/assign-to-me`, {
+
       });
 
-      // Remove from the list since it's no longer open
-      setServiceRequests(prev => prev.filter(sr => sr.id !== serviceRequestId));
+      if (resp.success) {
+        // Remove from the list since it's no longer open
+        setServiceRequests(prev => prev.filter(sr => sr.id !== serviceRequestId));
 
-      Alert.alert(
-        'Success',
-        'Service request has been assigned to you successfully!',
-        [
-          {
-            text: 'View Details',
-            onPress: () => router.push(`/servicerequestdetails/${serviceRequestId}` as any),
-          },
-        ]
-      );
+        Alert.alert(
+          'Success',
+          'Service request has been assigned to you successfully!',
+          [
+            {
+              text: 'View Details',
+              onPress: () => router.push(`/services/${serviceRequestId}` as any),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Error',
+          'Failed to assign the service request. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
       console.log('Failed to assign service request:', error);
       Alert.alert(
@@ -296,121 +228,125 @@ const OpenServiceRequestsScreen = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {serviceRequests.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialIcons name="assignment-turned-in" size={64} color="#9CA3AF" />
-            <Text style={styles.emptyTitle}>No Open Requests</Text>
-            <Text style={styles.emptySubtitle}>
-              All service requests have been assigned. Check back later for new requests.
-            </Text>
-          </View>
-        ) : (
-          serviceRequests.map((request) => {
-            const typeColors = getServiceTypeColor(request.type);
-            const priorityColors = getPriorityColor(request.priority);
-            const isAssigning = assigningId === request.id;
-
-            return (
-              <View key={request.id} style={styles.requestCard}>
-                <View style={styles.requestHeader}>
-                  <View style={[styles.typeIcon, { backgroundColor: typeColors.bg }]}>
-                    <MaterialIcons
-                      name={getServiceTypeIcon(request.type) as any}
-                      size={20}
-                      color={typeColors.icon}
-                    />
-                  </View>
-
-                  <View style={styles.requestInfo}>
-                    <Text style={styles.requestTitle}>{request.type.toUpperCase()}</Text>
-                   
-                  </View>
-
-                  <View style={[
-                    styles.priorityBadge,
-                    {
-                      backgroundColor: priorityColors.bg,
-                      borderColor: priorityColors.border
-                    }
-                  ]}>
-                    <Text style={[
-                      styles.priorityText,
-                      { color: priorityColors.text }
-                    ]}>
-                      {request.priority.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.requestDescription}>{request.description}</Text>
-
-                <View style={styles.customerInfo}>
-                  <View style={styles.infoRow}>
-                    <MaterialIcons name="person" size={16} color="#6B7280" />
-                    <Text style={styles.infoText}>{request.customerName}</Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <MaterialIcons name="location-on" size={16} color="#6B7280" />
-                    <Text style={styles.infoText} numberOfLines={1}>
-                      {request.customerAddress}
-                    </Text>
-                  </View>
-                  <View style={styles.infoRow}>
-                    <MaterialIcons name="phone" size={16} color="#6B7280" />
-                    <Text style={styles.infoText}>{request.customerPhone}</Text>
-                  </View>
-                </View>
-
-                {request.productType && (
-                  <View style={styles.productInfo}>
-                    <MaterialIcons name="devices" size={16} color="#6B7280" />
-                    <Text style={styles.productText}>{request.productType}</Text>
-                  </View>
-                )}
-
-                <View style={styles.requestFooter}>
-                  <View style={styles.timeInfo}>
-                    <MaterialIcons name="schedule" size={14} color="#9CA3AF" />
-                    <Text style={styles.timeText}>
-                      Created {formatDate(request.createdAt)}
-                    </Text>
-                  </View>
-
-                  {request.estimatedDuration && (
-                    <View style={styles.durationInfo}>
-                      <MaterialIcons name="timer" size={14} color="#9CA3AF" />
-                      <Text style={styles.durationText}>
-                        Est: {request.estimatedDuration}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-
-                <TouchableOpacity
-                  style={[
-                    styles.assignButton,
-                    isAssigning && styles.assigningButton
-                  ]}
-                  onPress={() => handleAssignRequest(request)}
-                  disabled={isAssigning}
-                  activeOpacity={0.8}
-                >
-                  {isAssigning ? (
-                    <Text style={styles.assigningText}>Assigning...</Text>
-                  ) : (
-                    <>
-                      <MaterialIcons name="assignment-ind" size={18} color="#FFFFFF" />
-                      <Text style={styles.assignText}>Assign to Me</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+        <TouchableWithoutFeedback>
+          <View style={{}}>
+            {serviceRequests.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="assignment-turned-in" size={64} color="#9CA3AF" />
+                <Text style={styles.emptyTitle}>No Open Requests</Text>
+                <Text style={styles.emptySubtitle}>
+                  All service requests have been assigned. Check back later for new requests.
+                </Text>
               </View>
-            );
-          })
-        )}
+            ) : (
+              serviceRequests.map((request) => {
+                const typeColors = getServiceTypeColor(request.type);
+                const priorityColors = getPriorityColor(request.priority);
+                const isAssigning = assigningId === request.id;
 
-        <View style={styles.bottomPadding} />
+                return (
+                  <View key={request.id} style={styles.requestCard}>
+                    <View style={styles.requestHeader}>
+                      <View style={[styles.typeIcon, { backgroundColor: typeColors.bg }]}>
+                        <MaterialIcons
+                          name={getServiceTypeIcon(request.type) as any}
+                          size={20}
+                          color={typeColors.icon}
+                        />
+                      </View>
+
+                      <View style={styles.requestInfo}>
+                        <Text style={styles.requestTitle}>{request.type.toUpperCase()}</Text>
+
+                      </View>
+
+                      <View style={[
+                        styles.priorityBadge,
+                        {
+                          backgroundColor: priorityColors.bg,
+                          borderColor: priorityColors.border
+                        }
+                      ]}>
+                        <Text style={[
+                          styles.priorityText,
+                          { color: priorityColors.text }
+                        ]}>
+                          {request.priority.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.requestDescription}>{request.description}</Text>
+
+                    <View style={styles.customerInfo}>
+                      <View style={styles.infoRow}>
+                        <MaterialIcons name="person" size={16} color="#6B7280" />
+                        <Text style={styles.infoText}>{request.customerName}</Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <MaterialIcons name="location-on" size={16} color="#6B7280" />
+                        <Text style={styles.infoText} numberOfLines={1}>
+                          {request.customerAddress}
+                        </Text>
+                      </View>
+                      <View style={styles.infoRow}>
+                        <MaterialIcons name="phone" size={16} color="#6B7280" />
+                        <Text style={styles.infoText}>{request.customerPhone}</Text>
+                      </View>
+                    </View>
+
+                    {request.productType && (
+                      <View style={styles.productInfo}>
+                        <MaterialIcons name="devices" size={16} color="#6B7280" />
+                        <Text style={styles.productText}>{request.productType}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.requestFooter}>
+                      <View style={styles.timeInfo}>
+                        <MaterialIcons name="schedule" size={14} color="#9CA3AF" />
+                        <Text style={styles.timeText}>
+                          Created {formatDate(request.createdAt)}
+                        </Text>
+                      </View>
+
+                      {request.estimatedDuration && (
+                        <View style={styles.durationInfo}>
+                          <MaterialIcons name="timer" size={14} color="#9CA3AF" />
+                          <Text style={styles.durationText}>
+                            Est: {request.estimatedDuration}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+
+                    <TouchableOpacity
+                      style={[
+                        styles.assignButton,
+                        isAssigning && styles.assigningButton
+                      ]}
+                      onPress={() => handleAssignRequest(request)}
+                      disabled={isAssigning}
+                      activeOpacity={0.8}
+                    >
+                      {isAssigning ? (
+                        <Text style={styles.assigningText}>Assigning...</Text>
+                      ) : (
+                        <>
+                          <MaterialIcons name="assignment-ind" size={18} color="#FFFFFF" />
+                          <Text style={styles.assignText}>Assign to Me</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })
+            )}
+
+            <View style={styles.bottomPadding} />
+          </View>
+        </TouchableWithoutFeedback>
       </ScrollView>
     </View>
   );

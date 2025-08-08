@@ -3,7 +3,6 @@ import React, { useEffect, useState } from "react"
 import { Alert, StatusBar, StyleSheet, Text, View } from "react-native"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 import { DynamicForm, type FormSection } from "../../../lib/components/dynamic-form/dynamic-form"
-import PolygonSelector from "../../../lib/components/ui/polygon-selector"
 import { apiService } from "@/lib/api/api"
 import { router, useLocalSearchParams } from "expo-router"
 
@@ -33,7 +32,7 @@ const FranchiseFormScreen = () => {
                     franchise_name: response.data.franchiseArea.name,
                     city_name: response.data.franchiseArea.city,
                     phone_number: response.data.franchiseArea.phoneNumber,
-                    franchise_polygon: response.data.franchiseArea.geoPolygon
+                    // franchise_polygon: response.data.franchiseArea.geoPolygon
                 }
             })
         } catch (error) {
@@ -45,11 +44,12 @@ const FranchiseFormScreen = () => {
 
     const handleSubmit = async (values: any) => {
         try {
+            console.log('values ', values)
             const payload = {
                 name: values.franchise_info.franchise_name,
                 city: values.franchise_info.city_name,
                 phoneNumber: values.franchise_info.phone_number,
-                geoPolygon: values.franchise_info.franchise_polygon.coordinates,
+                // geoPolygon: values.franchise_info.franchise_polygon.coordinates,
             }
 
             let result;
@@ -58,7 +58,7 @@ const FranchiseFormScreen = () => {
             if (isNew) {
                 result = await apiService.post('/franchises', payload);
 
-                console.log('in adding new frnahise ',result)
+                console.log('in adding new frnahise ', result)
                 if (!result.success) {
                     throw new Error('Unable to add Franchise')
                 }
@@ -73,7 +73,7 @@ const FranchiseFormScreen = () => {
                     outlets: 0,
                     employees: 0,
                     status: 'Active',
-                    geoPolygon: payload.geoPolygon,
+                    // geoPolygon: payload.geoPolygon,
                     isCompanyManaged: true,
                 };
             } else {
@@ -92,20 +92,20 @@ const FranchiseFormScreen = () => {
                     outlets: 0,
                     employees: 0,
                     status: 'Active',
-                    geoPolygon: payload.geoPolygon,
+                    // geoPolygon: payload.geoPolygon,
                     isCompanyManaged: true,
                 };
-                console.log('in updating frnahise ',result)
+                console.log('in updating frnahise ', result)
             }
 
             Alert.alert("Success", `Franchise ${isNew ? "created" : "updated"} successfully`)
-            
+
             // Use setTimeout to ensure navigation happens after state updates
             setTimeout(async () => {
                 try {
                     await router.push({
                         pathname: '/(tabs)/manage',
-                        params: { 
+                        params: {
                             tab: 'Franchises',
                             refreshData: JSON.stringify({
                                 type: isNew ? 'add' : 'update',
@@ -167,22 +167,37 @@ const FranchiseFormScreen = () => {
                         },
                     },
                 },
-                {
-                    id: "franchise_polygon",
-                    type: "custom",
-                    label: "Service Area (Polygon)",
-                    placeholder: "Select franchise area on map",
-                    customComponent: PolygonSelector,
-                    required: true,
-                    validation: {
-                        custom: (value: any) => {
-                            if (value && (!value.coordinates || value.coordinates.length < 3)) {
-                                return "Franchise area must have at least 3 coordinates"
-                            }
-                            return null
-                        },
-                    },
-                },
+                // {
+                //     id: "franchise_polygon",
+                //     type: "custom",
+                //     label: "Service Area (Polygon)",
+                //     placeholder: "Select franchise area on map",
+                //     customComponent: PolygonSelector,
+                //     required: true,
+                //     validation: {
+                //         custom: (value: any) => {
+                //             console.log('value is ', value)
+
+                //             // Handle different data structures
+                //             let coordinates;
+                //             if (Array.isArray(value)) {
+                //                 // Direct array of coordinates
+                //                 coordinates = value;
+                //             } else if (value && value.coordinates) {
+                //                 // Object with coordinates property
+                //                 coordinates = value.coordinates;
+                //             } else {
+                //                 // No valid data
+                //                 coordinates = [];
+                //             }
+
+                //             if (coordinates.length < 3) {
+                //                 return "Franchise area must have at least 3 coordinates"
+                //             }
+                //             return null
+                //         },
+                //     },
+                // },
             ],
         },
     ]

@@ -11,6 +11,7 @@ import FranchiseScreen from './FranchiseScreen'
 import ProductsScreen from './ProductsScreen'
 import CategoriesScree from './CategoriesScree'
 import Subscriptions from './Subscriptions'
+import CancelSubscriptionsScreen from './CancelSubscriptionsScreen'
 
 const Tab = createMaterialTopTabNavigator()
 
@@ -41,8 +42,9 @@ const Manage = () => {
             { name: 'Products', component: ProductsScreen, roles: [UserRole.ADMIN] },
             { name: 'Franchises', component: FranchiseScreen, roles: [UserRole.ADMIN] },
             { name: 'Agents', component: AgentsScreen, roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER] },
-            { name: 'Customers', component: CustomersScreen, roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER] },
+            { name: 'Customers', component: CustomersScreen, roles: [UserRole.ADMIN] },
             { name: 'Subscriptions', component: Subscriptions, roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER] },
+            { name: 'Cancel Requests', component: CancelSubscriptionsScreen, roles: [UserRole.ADMIN, UserRole.FRANCHISE_OWNER] },
         ];
 
         return allTabs.filter(tab => tab.roles.includes(user.role));
@@ -64,7 +66,7 @@ const Manage = () => {
                 </Text>
             ),
             headerTitleAlign: 'center',
-            headerShadowVisible :false
+            headerShadowVisible: false
         });
     }, [navigation]);
 

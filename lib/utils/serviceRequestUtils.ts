@@ -69,6 +69,7 @@ export const getAvailableTransitions = (
 ): ServiceRequestStatus[] => {
   const possibleTransitions = validTransitions[currentStatus] || [];
 
+  console.log('requsts is in transistions ',request)
   // Filter transitions based on user role
   return possibleTransitions.filter(transition => {
     // Only admins and franchise owners can assign agents
@@ -85,7 +86,7 @@ export const getAvailableTransitions = (
       userRole !== UserRole.FRANCHISE_OWNER) {
       return false;
     }
-    if (currentStatus === ServiceRequestStatus.IN_PROGRESS && request.type !== 'installtion' && transition === ServiceRequestStatus.PAYMENT_PENDING) {
+    if (currentStatus === ServiceRequestStatus.IN_PROGRESS && request.type !== 'installation' && transition === ServiceRequestStatus.PAYMENT_PENDING) {
       return false
 
     }

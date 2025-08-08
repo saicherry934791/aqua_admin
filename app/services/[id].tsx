@@ -13,6 +13,7 @@ import {
   View,
   ActivityIndicator,
   Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -262,275 +263,277 @@ export const ServiceRequestDetailsScreen = () => {
     <View style={styles.container}>
       <StatusBar backgroundColor="#3B82F6" barStyle="light-content" />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} >
         {/* Service Summary Card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.requestHeader}>
-            <View style={styles.requestInfo}>
-              <View style={styles.serviceTypeContainer}>
-                <View style={[styles.serviceTypeIcon, { backgroundColor: serviceTypeColor + '20' }]}>
-                  <Ionicons
-                    name={getServiceTypeIcon(request.type) as any}
-                    size={20}
-                    color={serviceTypeColor}
-                  />
-                </View>
-                <View>
-                  <Text style={styles.requestId}>#{request.id?.slice(-6)?.toUpperCase()}</Text>
-                  <Text style={[styles.serviceType, { color: serviceTypeColor }]}>
-                    {request.type.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-            </View>
-            <Text style={styles.requestDate}>{formatDate(request.createdAt)}</Text>
-          </View>
-
-          <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
-            <Text style={[styles.statusText, { color: statusColors.text }]}>
-              {getStatusDisplayName(request.status)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Status Transitions */}
-        {updating ? (
-          <View style={styles.updatingContainer}>
-            <ActivityIndicator size="large" color="#3B82F6" />
-            <Text style={styles.updatingText}>Updating service request...</Text>
-          </View>
-        ) : (
-          <ServiceStatusTransitions
-            request={request}
-            userRole={user?.role || UserRole.SERVICE_AGENT}
-            beforeImages={beforeImages}
-            afterImages={afterImages}
-            onStatusUpdate={handleStatusUpdate}
-            onAssignAgent={handleAssignAgent}
-            onScheduleService={handleScheduleService}
-          />
-        )}
-
-        {/* Service Details */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Service Details</Text>
-          <View style={styles.serviceSection}>
-            <View style={styles.productInfo}>
-              <Text style={styles.productName}>{request.product?.name}</Text>
-              <Text style={styles.productModel}>Model: {request.product?.model}</Text>
-              <Text style={styles.serviceDescription}>{request.description}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Customer Details */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Customer Details</Text>
-          <View style={styles.customerSection}>
-            <View style={styles.customerInfo}>
-              <View style={styles.customerNameRow}>
-                <Ionicons name="person" size={20} color="#6B7280" />
-                <Text style={styles.customerName}>{request.customer?.name}</Text>
-              </View>
-            </View>
-
-            <View style={styles.contactRow}>
-              <View style={styles.contactInfo}>
-                <Ionicons name="call" size={16} color="#6B7280" />
-                <Text style={styles.contactText}>{request.customer?.phone}</Text>
-              </View>
-              <View style={styles.contactActions}>
-                <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={() => handlePhoneCall(request.customer?.phone)}
-                >
-                  <Ionicons name="call" size={16} color="#3B82F6" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={() => handleWhatsApp(request.customer?.phone)}
-                >
-                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Assigned Agent */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Assigned Agent</Text>
-            {user?.role === UserRole.ADMIN && request.assignedAgent && (request.status === ServiceRequestStatus.ASSIGNED || request.status === ServiceRequestStatus.SCHEDULED) && (
-              <TouchableOpacity
-                style={styles.assignButton}
-                onPress={handleAssignAgent}
-              >
-                <Ionicons name="person-add" size={14} color="#3B82F6" />
-                <Text style={styles.assignButtonText}>Reassign</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {request.assignedAgent ? (
-            <View style={styles.agentSection}>
-              <View style={styles.agentInfo}>
-                <Ionicons name="person-circle" size={20} color="#6B7280" />
-                <View style={styles.agentDetails}>
-                  <Text style={styles.agentName}>{request.assignedAgent?.name}</Text>
-                  <Text style={styles.agentPhone}>{request.assignedAgent?.phone}</Text>
-                </View>
-              </View>
-              <View style={styles.contactActions}>
-                <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={() => handlePhoneCall(request.assignedAgent?.phone || '')}
-                >
-                  <Ionicons name="call" size={16} color="#3B82F6" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.contactButton}
-                  onPress={() => handleWhatsApp(request.assignedAgent?.phone || '')}
-                >
-                  <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.noAgentSection}>
-              <View style={styles.noAgentIcon}>
-                <Ionicons name="person-add" size={24} color="#3B82F6" />
-              </View>
-              <Text style={styles.noAgentText}>No agent assigned yet</Text>
-            </View>
-          )}
-        </View>
-
-        {request.scheduledDate && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Schedule Details</Text>
-              {/* Show pencil only for admin and if not cancelled */}
-              {user?.role === UserRole.ADMIN && request.status === ServiceRequestStatus.SCHEDULED && (
-                <TouchableOpacity onPress={() => handleScheduleService(true)}>
-                  <Ionicons name="pencil" size={20} color="#3B82F6" />
-                </TouchableOpacity>
-              )}
-            </View>
-            <View style={styles.scheduleSection}>
-              <View style={styles.scheduleRow}>
-                <Ionicons name="calendar" size={20} color="#10B981" />
-                <View style={styles.scheduleInfo}>
-                  <Text style={styles.scheduleLabel}>Scheduled Date</Text>
-                  <Text style={styles.scheduleDate}>{formatDate(request.scheduledDate)}</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-
-
-        {/* Payment Information */}
-        {(request.requirePayment || request.paymentAmount) && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Payment Information</Text>
-            <View style={styles.paymentSection}>
-              {request.paymentAmount && (
-                <View style={styles.paymentRow}>
-                  <Text style={styles.paymentLabel}>Amount:</Text>
-                  <Text style={styles.paymentValue}>{formatCurrency(request.paymentAmount)}</Text>
-                </View>
-              )}
-
-              {request.paymentStatus && (
-                <View style={styles.paymentStatusRow}>
-                  <Text style={styles.paymentLabel}>Status:</Text>
-                  <View style={[styles.paymentStatusBadge, {
-                    backgroundColor:
-                      request.paymentStatus.status === 'COMPLETED' ? '#D1FAE5' :
-                        request.paymentStatus.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
-                  }]}>
-                    <Text style={[styles.paymentStatusText, {
-                      color:
-                        request.paymentStatus.status === 'COMPLETED' ? '#047857' :
-                          request.paymentStatus.status === 'PENDING' ? '#92400E' : '#B91C1C'
-                    }]}>
-                      {request.paymentStatus.status}
-                    </Text>
+        <TouchableWithoutFeedback>
+          <View style={{}}>
+            <View style={styles.summaryCard}>
+              <View style={styles.requestHeader}>
+                <View style={styles.requestInfo}>
+                  <View style={styles.serviceTypeContainer}>
+                    <View style={[styles.serviceTypeIcon, { backgroundColor: serviceTypeColor + '20' }]}>
+                      <Ionicons
+                        name={getServiceTypeIcon(request.type) as any}
+                        size={20}
+                        color={serviceTypeColor}
+                      />
+                    </View>
+                    <View>
+                      <Text style={styles.requestId}>#{request.id?.slice(-6)?.toUpperCase()}</Text>
+                      <Text style={[styles.serviceType, { color: serviceTypeColor }]}>
+                        {request.type.toUpperCase()}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              )}
+                <Text style={styles.requestDate}>{formatDate(request.createdAt)}</Text>
+              </View>
 
-              {/* Payment Actions */}
-              {request.status === ServiceRequestStatus.PAYMENT_PENDING && (
-                <View style={styles.paymentActions}>
-                  {!request.paymentStatus?.razorpayPaymentLink && (
+              <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                <View style={[styles.statusDot, { backgroundColor: statusColors.dot }]} />
+                <Text style={[styles.statusText, { color: statusColors.text }]}>
+                  {getStatusDisplayName(request.status)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Status Transitions */}
+            {updating ? (
+              <View style={styles.updatingContainer}>
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text style={styles.updatingText}>Updating service request...</Text>
+              </View>
+            ) : (
+              <ServiceStatusTransitions
+                request={request}
+                userRole={user?.role || UserRole.SERVICE_AGENT}
+                beforeImages={beforeImages}
+                afterImages={afterImages}
+                onStatusUpdate={handleStatusUpdate}
+                onAssignAgent={handleAssignAgent}
+                onScheduleService={handleScheduleService}
+              />
+            )}
+
+            {/* Service Details */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Service Details</Text>
+              <View style={styles.serviceSection}>
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName}>{request.product?.name}</Text>
+                  <Text style={styles.productModel}>Model: {request.product?.model}</Text>
+                  <Text style={styles.serviceDescription}>{request.description}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Customer Details */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Customer Details</Text>
+              <View style={styles.customerSection}>
+                <View style={styles.customerInfo}>
+                  <View style={styles.customerNameRow}>
+                    <Ionicons name="person" size={20} color="#6B7280" />
+                    <Text style={styles.customerName}>{request.customer?.name}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.contactRow}>
+                  <View style={styles.contactInfo}>
+                    <Ionicons name="call" size={16} color="#6B7280" />
+                    <Text style={styles.contactText}>{request.customer?.phone}</Text>
+                  </View>
+                  <View style={styles.contactActions}>
                     <TouchableOpacity
-                      style={styles.paymentButton}
-                      onPress={createPaymentLink}
-                      disabled={updating}
+                      style={styles.contactButton}
+                      onPress={() => handlePhoneCall(request.customer?.phone)}
                     >
-                      {updating ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <>
-                          <Ionicons name="link" size={16} color="#fff" />
-                          <Text style={styles.paymentButtonText}>Create Payment Link</Text>
-                        </>
-                      )}
+                      <Ionicons name="call" size={16} color="#3B82F6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.contactButton}
+                      onPress={() => handleWhatsApp(request.customer?.phone)}
+                    >
+                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* Assigned Agent */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle}>Assigned Agent</Text>
+                {user?.role === UserRole.ADMIN && request.assignedAgent && (request.status === ServiceRequestStatus.ASSIGNED || request.status === ServiceRequestStatus.SCHEDULED) && (
+                  <TouchableOpacity
+                    style={styles.assignButton}
+                    onPress={handleAssignAgent}
+                  >
+                    <Ionicons name="person-add" size={14} color="#3B82F6" />
+                    <Text style={styles.assignButtonText}>Reassign</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {request.assignedAgent ? (
+                <View style={styles.agentSection}>
+                  <View style={styles.agentInfo}>
+                    <Ionicons name="person-circle" size={20} color="#6B7280" />
+                    <View style={styles.agentDetails}>
+                      <Text style={styles.agentName}>{request.assignedAgent?.name}</Text>
+                      <Text style={styles.agentPhone}>{request.assignedAgent?.phone}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.contactActions}>
+                    <TouchableOpacity
+                      style={styles.contactButton}
+                      onPress={() => handlePhoneCall(request.assignedAgent?.phone || '')}
+                    >
+                      <Ionicons name="call" size={16} color="#3B82F6" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.contactButton}
+                      onPress={() => handleWhatsApp(request.assignedAgent?.phone || '')}
+                    >
+                      <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.noAgentSection}>
+                  <View style={styles.noAgentIcon}>
+                    <Ionicons name="person-add" size={24} color="#3B82F6" />
+                  </View>
+                  <Text style={styles.noAgentText}>No agent assigned yet</Text>
+                </View>
+              )}
+            </View>
+
+            {request.scheduledDate && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitle}>Schedule Details</Text>
+                  {/* Show pencil only for admin and if not cancelled */}
+                  {user?.role === UserRole.ADMIN && request.status === ServiceRequestStatus.SCHEDULED && (
+                    <TouchableOpacity onPress={() => handleScheduleService(true)}>
+                      <Ionicons name="pencil" size={20} color="#3B82F6" />
                     </TouchableOpacity>
                   )}
+                </View>
+                <View style={styles.scheduleSection}>
+                  <View style={styles.scheduleRow}>
+                    <Ionicons name="calendar" size={20} color="#10B981" />
+                    <View style={styles.scheduleInfo}>
+                      <Text style={styles.scheduleLabel}>Scheduled Date</Text>
+                      <Text style={styles.scheduleDate}>{formatDate(request.scheduledDate)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
 
-                  {request.paymentStatus?.razorpayPaymentLink && (
-                    <View style={styles.paymentContainer}>
-                      {/* Existing payment link button */}
-                      <TouchableOpacity
-                        style={styles.paymentLinkButton}
-                        onPress={() => Linking.openURL(request.paymentStatus?.razorpayPaymentLink || '')}
-                      >
-                        <Ionicons name="link" size={16} color="#3B82F6" />
-                        <Text style={styles.paymentLinkText}>View Payment Link</Text>
-                      </TouchableOpacity>
 
-                      {/* QR Code button */}
-                      <TouchableOpacity
-                        style={styles.qrButton}
-                        onPress={() => setShowQR(true)}
-                      >
-                        <Ionicons name="qr-code" size={16} color="#3B82F6" />
-                        <Text style={styles.qrButtonText}>Show QR Code</Text>
-                      </TouchableOpacity>
-
-                      {/* QR Code Modal */}
-                      <Modal
-                        visible={showQR}
-                        transparent={true}
-                        animationType="fade"
-                        onRequestClose={() => setShowQR(false)}
-                      >
-                        <View style={styles.modalOverlay}>
-                          <View style={styles.qrContainer}>
-                            <Text style={styles.qrTitle}>Scan to Pay</Text>
-                            <QRCode
-                              value={request.paymentStatus?.razorpayPaymentLink || ''}
-                              size={200}
-                              color="black"
-                              backgroundColor="white"
-                            />
-                            <TouchableOpacity
-                              style={styles.closeButton}
-                              onPress={() => setShowQR(false)}
-                            >
-                              <Text style={styles.closeButtonText}>Close</Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      </Modal>
+            {/* Payment Information */}
+            {(request.requirePayment || request.paymentAmount) && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Payment Information</Text>
+                <View style={styles.paymentSection}>
+                  {request.paymentAmount && (
+                    <View style={styles.paymentRow}>
+                      <Text style={styles.paymentLabel}>Amount:</Text>
+                      <Text style={styles.paymentValue}>{formatCurrency(request.paymentAmount)}</Text>
                     </View>
                   )}
 
-                  {/* {request.paymentStatus?.razorpayPaymentLink && (
+                  {request.paymentStatus && (
+                    <View style={styles.paymentStatusRow}>
+                      <Text style={styles.paymentLabel}>Status:</Text>
+                      <View style={[styles.paymentStatusBadge, {
+                        backgroundColor:
+                          request.paymentStatus.status === 'COMPLETED' ? '#D1FAE5' :
+                            request.paymentStatus.status === 'PENDING' ? '#FEF3C7' : '#FEE2E2',
+                      }]}>
+                        <Text style={[styles.paymentStatusText, {
+                          color:
+                            request.paymentStatus.status === 'COMPLETED' ? '#047857' :
+                              request.paymentStatus.status === 'PENDING' ? '#92400E' : '#B91C1C'
+                        }]}>
+                          {request.paymentStatus.status}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Payment Actions */}
+                  {request.status === ServiceRequestStatus.PAYMENT_PENDING && (
+                    <View style={styles.paymentActions}>
+                      {!request.paymentStatus?.razorpayPaymentLink && (
+                        <TouchableOpacity
+                          style={styles.paymentButton}
+                          onPress={createPaymentLink}
+                          disabled={updating}
+                        >
+                          {updating ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <>
+                              <Ionicons name="link" size={16} color="#fff" />
+                              <Text style={styles.paymentButtonText}>Create Payment Link</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      )}
+
+                      {request.paymentStatus?.razorpayPaymentLink && (
+                        <View style={styles.paymentContainer}>
+                          {/* Existing payment link button */}
+                          <TouchableOpacity
+                            style={styles.paymentLinkButton}
+                            onPress={() => Linking.openURL(request.paymentStatus?.razorpayPaymentLink || '')}
+                          >
+                            <Ionicons name="link" size={16} color="#3B82F6" />
+                            <Text style={styles.paymentLinkText}>View Payment Link</Text>
+                          </TouchableOpacity>
+
+                          {/* QR Code button */}
+                          <TouchableOpacity
+                            style={styles.qrButton}
+                            onPress={() => setShowQR(true)}
+                          >
+                            <Ionicons name="qr-code" size={16} color="#3B82F6" />
+                            <Text style={styles.qrButtonText}>Show QR Code</Text>
+                          </TouchableOpacity>
+
+                          {/* QR Code Modal */}
+                          <Modal
+                            visible={showQR}
+                            transparent={true}
+                            animationType="fade"
+                            onRequestClose={() => setShowQR(false)}
+                          >
+                            <View style={styles.modalOverlay}>
+                              <View style={styles.qrContainer}>
+                                <Text style={styles.qrTitle}>Scan to Pay</Text>
+                                <QRCode
+                                  value={request.paymentStatus?.razorpayPaymentLink || ''}
+                                  size={200}
+                                  color="black"
+                                  backgroundColor="white"
+                                />
+                                <TouchableOpacity
+                                  style={styles.closeButton}
+                                  onPress={() => setShowQR(false)}
+                                >
+                                  <Text style={styles.closeButtonText}>Close</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          </Modal>
+                        </View>
+                      )}
+
+                      {/* {request.paymentStatus?.razorpayPaymentLink && (
                     <TouchableOpacity
                       style={styles.paymentLinkButton}
                       onPress={() => Linking.openURL(request.paymentStatus?.razorpayPaymentLink || '')}
@@ -540,39 +543,41 @@ export const ServiceRequestDetailsScreen = () => {
                     </TouchableOpacity>
                   )} */}
 
-                  {request.paymentStatus?.razorpaySubscriptionId && (
-                    <TouchableOpacity
-                      style={[styles.paymentButton, { backgroundColor: '#10B981' }]}
-                      onPress={verifyPaymentStatus}
-                      disabled={updating}
-                    >
-                      {updating ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                          <Text style={styles.paymentButtonText}>Verify Payment</Text>
-                        </>
+                      {request.paymentStatus?.razorpaySubscriptionId && (
+                        <TouchableOpacity
+                          style={[styles.paymentButton, { backgroundColor: '#10B981' }]}
+                          onPress={verifyPaymentStatus}
+                          disabled={updating}
+                        >
+                          {updating ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                          ) : (
+                            <>
+                              <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                              <Text style={styles.paymentButtonText}>Verify Payment</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
                       )}
-                    </TouchableOpacity>
+                    </View>
                   )}
                 </View>
-              )}
-            </View>
-          </View>
-        )}
+              </View>
+            )}
 
-        {/* Service Images */}
-        <ServiceImageManager
-          serviceType={request.type}
-          currentStatus={request.status}
-          initialImages={request.images || []}
-          beforeImages={beforeImages}
-          afterImages={afterImages}
-          onBeforeImagesChange={setBeforeImages}
-          onAfterImagesChange={setAfterImages}
-          onViewImages={viewImages}
-        />
+            {/* Service Images */}
+            <ServiceImageManager
+              serviceType={request.type}
+              currentStatus={request.status}
+              initialImages={request.images || []}
+              beforeImages={beforeImages}
+              afterImages={afterImages}
+              onBeforeImagesChange={setBeforeImages}
+              onAfterImagesChange={setAfterImages}
+              onViewImages={viewImages}
+            />
+          </View>
+        </TouchableWithoutFeedback>
       </ScrollView>
 
       {/* Image Viewer Action Sheet */}
@@ -1046,7 +1051,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '500',
   },
- 
+
   imageViewerContent: {
     height: screenWidth * 1.2,
     backgroundColor: '#000000',

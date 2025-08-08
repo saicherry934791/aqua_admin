@@ -10,7 +10,8 @@ import {
   Text,
   View,
   Keyboard,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback
 } from "react-native"
 import { Button } from "../ui/button"
 import { ImagePickerComponent } from "../ui/image-picker"
@@ -77,7 +78,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
 
   const updateValue = useCallback(
     (sectionId: string, fieldId: string, value: any) => {
-    //  console.log('value before is ',value)
+      //  console.log('value before is ',value)
       setValues((prev: any) => ({
         ...prev,
         [sectionId]: {
@@ -85,7 +86,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
           [fieldId]: value,
         },
       }))
-    
+
 
       // Clear error when user starts typing after a submission attempt
       if (errors[sectionId]?.[fieldId]) {
@@ -205,12 +206,12 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
   }
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
     >
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -221,37 +222,40 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
         overScrollMode="never"
         contentInsetAdjustmentBehavior="automatic"
       >
-        {sections.map((section) => (
-          <View key={section.id} style={styles.section}>
-            {section.title && <Text style={styles.sectionTitle}>{section.title}</Text>}
+        <TouchableWithoutFeedback>
+          <View>
+            {sections.map((section) => (
+              <View key={section.id} style={styles.section}>
+                {section.title && <Text style={styles.sectionTitle}>{section.title}</Text>}
 
-            {section.fields && (
-              <View>
-                {section.fields.map((field) => renderField(section, field))}
+                {section.fields && (
+                  <View>
+                    {section.fields.map((field) => renderField(section, field))}
+                  </View>
+                )}
+
+                {section.repeatable && (
+                  <RepeatableSection
+                    title={section.title || "Items"}
+                    fields={section.repeatable.fields as BaseFormFieldConfig[]}
+                    values={Array.isArray(values[section.id]) && values[section.id].length > 0 ? values[section.id] : [{}]}
+                    onChange={(newValues) => updateRepeatableValues(section.id, newValues)}
+                    errors={errors[section.id]}
+                    minItems={section.repeatable.minItems}
+                    maxItems={section.repeatable.maxItems}
+                  />
+                )}
               </View>
-            )}
+            ))}
 
-            {section.repeatable && (
-              <RepeatableSection
-                title={section.title || "Items"}
-                fields={section.repeatable.fields as BaseFormFieldConfig[]}
-                values={Array.isArray(values[section.id]) && values[section.id].length > 0 ? values[section.id] : [{}]}
-                onChange={(newValues) => updateRepeatableValues(section.id, newValues)}
-                errors={errors[section.id]}
-                minItems={section.repeatable.minItems}
-                maxItems={section.repeatable.maxItems}
+            <View style={styles.submitContainer}>
+              <Button
+                title={isSubmitting ? "Submitting..." : submitButtonText}
+                onPress={handleSubmit}
+                disabled={isSubmitting || loading}
               />
-            )}
-          </View>
-        ))}
-
-        <View style={styles.submitContainer}>
-          <Button
-            title={isSubmitting ? "Submitting..." : submitButtonText}
-            onPress={handleSubmit}
-            disabled={isSubmitting || loading}
-          />
-        </View>
+            </View></View>
+        </TouchableWithoutFeedback>
       </ScrollView>
     </KeyboardAvoidingView>
   )
