@@ -5,14 +5,14 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+    Alert,
     Image,
+    Linking,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
-    Alert,
-    Linking
+    View
 } from 'react-native';
 
 interface SubscriptionDetails {
@@ -122,9 +122,10 @@ const SubscriptionDetailsScreen = () => {
         }
     };
 
-    const formatCurrency = (amount: number) => {
-        return `₹${amount.toLocaleString()}`;
-    };
+    const formatCurrency = (amount: number | string | null | undefined) => {
+        const value = typeof amount === 'number' ? amount : Number(amount ?? 0)
+        return `₹${value.toLocaleString()}`
+    }
 
     const getStatusColor = (status: string) => {
         switch (status.toUpperCase()) {
@@ -201,9 +202,7 @@ const SubscriptionDetailsScreen = () => {
                                         },
                                     ]
                                 );
-                            } else {
-                                Alert.alert("Error", "Failed to check subscription status.");
-                            }
+                            } 
                         } catch (error) {
                             console.log('error is ', error)
 
@@ -245,7 +244,7 @@ const SubscriptionDetailsScreen = () => {
         );
     }
 
-    const statusStyle = getStatusColor(subscription.status);
+    const statusStyle = getStatusColor(subscription.status || '');
 
     return (
         <View style={styles.container}>
@@ -260,13 +259,13 @@ const SubscriptionDetailsScreen = () => {
                 <View style={styles.headerCard}>
                     <View style={styles.headerTop}>
                         <View style={styles.headerInfo}>
-                            <Text style={styles.subscriptionId}>#{subscription.connectId}</Text>
-                            <Text style={styles.planName}>{subscription.planName}</Text>
+                            <Text style={styles.subscriptionId}>#{subscription.connectId || 'N/A'}</Text>
+                            <Text style={styles.planName}>{subscription.planName || 'N/A'}</Text>
                         </View>
                         <View style={[styles.statusBadge, { backgroundColor: statusStyle.bgColor }]}>
                             <View style={[styles.statusDot, { backgroundColor: statusStyle.color }]} />
                             <Text style={[styles.statusText, { color: statusStyle.color }]}>
-                                {subscription.status}
+                                {subscription.status || 'N/A'}
                             </Text>
                         </View>
                     </View>
@@ -284,7 +283,7 @@ const SubscriptionDetailsScreen = () => {
 
                     <View style={styles.dateRow}>
                         <Text style={styles.dateLabel}>Next Payment: </Text>
-                        <Text style={styles.dateValue}>{formatDate(subscription.nextPaymentDate)}</Text>
+                        <Text style={styles.dateValue}>{subscription.nextPaymentDate ? formatDate(subscription.nextPaymentDate) : 'N/A'}</Text>
                     </View>
                 </View>
 
@@ -296,41 +295,41 @@ const SubscriptionDetailsScreen = () => {
                     </View>
                     <View style={styles.customerInfo}>
                         <View style={styles.customerRow}>
-                            <Text style={styles.customerName}>{subscription.customer.name}</Text>
+                            <Text style={styles.customerName}>{subscription.customer?.name || 'N/A'}</Text>
                             <View style={[
                                 styles.customerStatusBadge,
-                                subscription.customer.isActive ? styles.badgeActive : styles.badgeInactive
+                                (subscription.customer?.isActive ? styles.badgeActive : styles.badgeInactive)
                             ]}>
                                 <Text style={[
                                     styles.customerStatusText,
-                                    { color: subscription.customer.isActive ? '#047857' : '#DC2626' }
+                                    { color: subscription.customer?.isActive ? '#047857' : '#DC2626' }
                                 ]}>
-                                    {subscription.customer.isActive ? 'Active' : 'Inactive'}
+                                    {subscription.customer?.isActive ? 'Active' : 'Inactive'}
                                 </Text>
                             </View>
                         </View>
 
                         <TouchableOpacity
                             style={styles.contactRow}
-                            onPress={() => handleCallCustomer(subscription.customer.phone)}
+                            onPress={() => subscription.customer?.phone && handleCallCustomer(subscription.customer.phone)}
                         >
                             <Ionicons name="call" size={14} color="#6B7280" />
-                            <Text style={styles.contactText}>{subscription.customer.phone}</Text>
+                            <Text style={styles.contactText}>{subscription.customer?.phone || 'N/A'}</Text>
                         </TouchableOpacity>
 
-                        {subscription.customer.alternativePhone && (
+                        {subscription.customer?.alternativePhone && (
                             <TouchableOpacity
                                 style={styles.contactRow}
-                                onPress={() => handleCallCustomer(subscription.customer.alternativePhone)}
+                                onPress={() => handleCallCustomer(subscription.customer!.alternativePhone)}
                             >
                                 <Ionicons name="call-outline" size={14} color="#6B7280" />
-                                <Text style={styles.contactText}>{subscription.customer.alternativePhone}</Text>
+                                <Text style={styles.contactText}>{subscription.customer?.alternativePhone}</Text>
                             </TouchableOpacity>
                         )}
 
                         <View style={styles.contactRow}>
                             <Ionicons name="location" size={14} color="#6B7280" />
-                            <Text style={styles.contactText}>{subscription.customer.city}</Text>
+                            <Text style={styles.contactText}>{subscription.customer?.city || 'N/A'}</Text>
                         </View>
                     </View>
                 </View>
@@ -342,13 +341,13 @@ const SubscriptionDetailsScreen = () => {
                         <Text style={styles.sectionTitle}>Product Details</Text>
                     </View>
 
-                    {subscription.product.images && subscription.product.images.length > 0 && (
+                    {(subscription.product?.images || []).length > 0 && (
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
                             style={styles.imageContainer}
                         >
-                            {subscription.product.images.map((image, index) => (
+                            {(subscription.product?.images || []).map((image, index) => (
                                 <Image
                                     key={index}
                                     source={{ uri: image }}
@@ -360,17 +359,17 @@ const SubscriptionDetailsScreen = () => {
                     )}
 
                     <View style={styles.productInfo}>
-                        <Text style={styles.productName}>{subscription.product.name}</Text>
-                        <Text style={styles.productDescription}>{subscription.product.description}</Text>
+                        <Text style={styles.productName}>{subscription.product?.name || 'N/A'}</Text>
+                        <Text style={styles.productDescription}>{subscription.product?.description || 'N/A'}</Text>
 
                         <View style={styles.priceRow}>
                             <View style={styles.priceBox}>
                                 <Text style={styles.priceLabel}>Rent Price</Text>
-                                <Text style={styles.priceValue}>{formatCurrency(subscription.product.rentPrice)}</Text>
+                                <Text style={styles.priceValue}>{formatCurrency(subscription.product?.rentPrice)}</Text>
                             </View>
                             <View style={styles.priceBox}>
                                 <Text style={styles.priceLabel}>Buy Price</Text>
-                                <Text style={styles.priceValue}>{formatCurrency(subscription.product.buyPrice)}</Text>
+                                <Text style={styles.priceValue}>{formatCurrency(subscription.product?.buyPrice)}</Text>
                             </View>
                         </View>
                     </View>
@@ -387,39 +386,39 @@ const SubscriptionDetailsScreen = () => {
                         <View style={styles.installationRow}>
                             <Text style={styles.installationLabel}>Status:</Text>
                             <Text style={styles.installationValue}>
-                                {subscription.installationRequest.status.replace('_', ' ')}
+                                {(subscription.installationRequest?.status || 'N/A').replace('_', ' ')}
                             </Text>
                         </View>
 
                         <View style={styles.installationRow}>
                             <Text style={styles.installationLabel}>Contact Person:</Text>
-                            <Text style={styles.installationValue}>{subscription.installationRequest.name}</Text>
+                            <Text style={styles.installationValue}>{subscription.installationRequest?.name || 'N/A'}</Text>
                         </View>
 
                         <View style={styles.installationRow}>
                             <Text style={styles.installationLabel}>Phone:</Text>
-                            <TouchableOpacity onPress={() => handleCallCustomer(subscription.installationRequest.phoneNumber)}>
+                            <TouchableOpacity onPress={() => subscription.installationRequest?.phoneNumber && handleCallCustomer(subscription.installationRequest.phoneNumber)}>
                                 <Text style={[styles.installationValue, styles.linkText]}>
-                                    {subscription.installationRequest.phoneNumber}
+                                    {subscription.installationRequest?.phoneNumber || 'N/A'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
 
                         <View style={styles.addressRow}>
                             <Ionicons name="location" size={14} color="#6B7280" />
-                            <Text style={styles.addressText}>{subscription.installationRequest.installationAddress}</Text>
+                            <Text style={styles.addressText}>{subscription.installationRequest?.installationAddress || 'N/A'}</Text>
                         </View>
 
-                        {subscription.installationRequest.completedDate && (
+                        {subscription.installationRequest?.completedDate && (
                             <View style={styles.installationRow}>
                                 <Text style={styles.installationLabel}>Completed:</Text>
                                 <Text style={styles.installationValue}>
-                                    {formatDate(subscription.installationRequest.completedDate)}
+                                    {formatDate(subscription.installationRequest?.completedDate as string)}
                                 </Text>
                             </View>
                         )}
 
-                        {subscription.installationRequest.autoPaymentEnabled && (
+                        {subscription.installationRequest?.autoPaymentEnabled && (
                             <View style={styles.autoPayRow}>
                                 <Ionicons name="card" size={16} color="#10B981" />
                                 <Text style={styles.autoPayText}>Auto Payment Enabled</Text>
@@ -436,10 +435,10 @@ const SubscriptionDetailsScreen = () => {
                     </View>
 
                     <View style={styles.franchiseInfo}>
-                        <Text style={styles.franchiseName}>{subscription.franchise.name}</Text>
+                        <Text style={styles.franchiseName}>{subscription.franchise?.name || 'N/A'}</Text>
                         <View style={styles.franchiseRow}>
                             <Ionicons name="location" size={14} color="#6B7280" />
-                            <Text style={styles.franchiseCity}>{subscription.franchise.city}</Text>
+                            <Text style={styles.franchiseCity}>{subscription.franchise?.city || 'N/A'}</Text>
                         </View>
                     </View>
                 </View>
@@ -451,24 +450,24 @@ const SubscriptionDetailsScreen = () => {
                         <Text style={styles.sectionTitle}>Payment History</Text>
                     </View>
 
-                    {subscription.payments.map((payment, index) => {
+                    {(subscription.payments || []).map((payment, index) => {
                         const paymentStatusStyle = getPaymentStatusColor(payment.status);
                         return (
                             <View key={payment.id} style={styles.paymentItem}>
                                 <View style={styles.paymentHeader}>
                                     <View style={styles.paymentInfo}>
-                                        <Text style={styles.paymentType}>{payment.type}</Text>
-                                        <Text style={styles.paymentAmount}>{formatCurrency(payment.amount / 100)}</Text>
+                                        <Text style={styles.paymentType}>{payment.type || 'N/A'}</Text>
+                                        <Text style={styles.paymentAmount}>{formatCurrency((payment.amount ?? 0) )}</Text>
                                     </View>
                                     <View style={[styles.paymentStatus, { backgroundColor: paymentStatusStyle.bgColor }]}>
                                         <Text style={[styles.paymentStatusText, { color: paymentStatusStyle.color }]}>
-                                            {payment.status}
+                                            {payment.status || 'N/A'}
                                         </Text>
                                     </View>
                                 </View>
                                 <View style={styles.paymentDetails}>
-                                    <Text style={styles.paymentMethod}>{payment.paymentMethod}</Text>
-                                    <Text style={styles.paymentDate}>{formatDate(payment.paidDate)}</Text>
+                                    <Text style={styles.paymentMethod}>{payment.paymentMethod || 'N/A'}</Text>
+                                    <Text style={styles.paymentDate}>{payment.paidDate ? formatDate(payment.paidDate) : 'N/A'}</Text>
                                 </View>
                             </View>
                         );
@@ -477,10 +476,10 @@ const SubscriptionDetailsScreen = () => {
 
                 {/* Action Buttons */}
                 <View style={styles.actionButtons}>
-                    {subscription.installationRequest.razorpayPaymentLink && (
+                    {subscription.installationRequest?.razorpayPaymentLink && (
                         <TouchableOpacity
                             style={[styles.actionButton, styles.primaryButton]}
-                            onPress={() => handleOpenPaymentLink(subscription.installationRequest.razorpayPaymentLink)}
+                            onPress={() => handleOpenPaymentLink(subscription.installationRequest!.razorpayPaymentLink)}
                         >
                             <Ionicons name="card" size={16} color="#fff" />
                             <Text style={styles.primaryButtonText}>Payment Link</Text>
@@ -488,7 +487,7 @@ const SubscriptionDetailsScreen = () => {
                     )}
 
                     {
-                        subscription.status !== 'TERMINATED' &&
+                        subscription.status && subscription.status !== 'TERMINATED' &&
                         <TouchableOpacity onPress={handleTerminate} style={[styles.actionButton, styles.secondaryButton]}>
                             <Ionicons name="create" size={16} color="#3B82F6" />
                             <Text style={styles.secondaryButtonText}>Terminate Subscription</Text>

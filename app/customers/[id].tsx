@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 
@@ -100,8 +101,8 @@ const CustomerDetailsScreen = () => {
     setLoading(true);
     try {
       const result = await apiService.get(`/auth/users/${id}/details`);
-      
-      console.log('result in customer details  ',JSON.stringify(result))
+
+      console.log('result in customer details  ', JSON.stringify(result))
       if (result.success) {
         setCustomer(result.data);
       } else {
@@ -237,7 +238,7 @@ const CustomerDetailsScreen = () => {
         {/* Recent Activity */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
-          
+
           {/* Recent Subscriptions */}
           {customer.subscriptions.slice(0, 2).map((subscription) => (
             <View key={subscription.id} style={styles.activityCard}>
@@ -263,8 +264,8 @@ const CustomerDetailsScreen = () => {
 
           {/* Recent Service Requests */}
           {customer.serviceRequests.slice(0, 2).map((service) => (
-            <TouchableOpacity 
-              key={service.id} 
+            <TouchableOpacity
+              key={service.id}
               style={styles.activityCard}
               onPress={() => router.push(`/services/${service.id}`)}
             >
@@ -378,8 +379,8 @@ const CustomerDetailsScreen = () => {
           </View>
         ) : (
           customer.installationRequests.map((installation) => (
-            <TouchableOpacity 
-              key={installation.id} 
+            <TouchableOpacity
+              key={installation.id}
               style={styles.installationCard}
               onPress={() => router.push(`/orders/${installation.id}`)}
             >
@@ -444,8 +445,8 @@ const CustomerDetailsScreen = () => {
           </View>
         ) : (
           customer.serviceRequests.map((service) => (
-            <TouchableOpacity 
-              key={service.id} 
+            <TouchableOpacity
+              key={service.id}
               style={styles.serviceCard}
               onPress={() => router.push(`/services/${service.id}`)}
             >
@@ -615,10 +616,10 @@ const CustomerDetailsScreen = () => {
               style={[styles.tab, activeTab === tab.key && styles.activeTab]}
               onPress={() => setActiveTab(tab.key as any)}
             >
-              <MaterialIcons 
-                name={tab.icon as any} 
-                size={16} 
-                color={activeTab === tab.key ? '#3B82F6' : '#6B7280'} 
+              <MaterialIcons
+                name={tab.icon as any}
+                size={16}
+                color={activeTab === tab.key ? '#3B82F6' : '#6B7280'}
               />
               <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText]}>
                 {tab.label}
@@ -630,7 +631,11 @@ const CustomerDetailsScreen = () => {
 
       {/* Tab Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderTabContent()}
+        <TouchableWithoutFeedback>
+          <View>
+            {renderTabContent()}
+          </View>
+        </TouchableWithoutFeedback>
       </ScrollView>
     </View>
   );

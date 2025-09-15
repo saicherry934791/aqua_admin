@@ -3,8 +3,8 @@ import { apiService } from '@/lib/api/api';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router, useNavigation } from 'expo-router';
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'SUBMITTED' | 'FRANCHISE_CONTACTED' | 'INSTALLATION_SCHEDULED' | 'INSTALLATION_IN_PROGRESS' | 'INSTALLATION_COMPLETED' | 'CANCELLED' | 'REJECTED';
@@ -50,19 +50,26 @@ interface InstallationRequest {
 }
 
 const InstallationRequestsScreen = () => {
+  const { status, orderType } = useLocalSearchParams();
   const [requests, setRequests] = useState<InstallationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [typeFilter, setTypeFilter] = useState<OrderTypeFilter>('all');
   const navigation = useNavigation();
+  const filterScrollViewRef = useRef<ScrollView>(null);
+  const filterButtonRefs = useRef<{ [key: string]: any }>({});
 
-  const fetchRequests = async () => {
-    setLoading(true);
+  const fetchRequests = async (append = false, targetPage = 1) => {
+    if (append) setLoadingMore(true); else setLoading(true);
     try {
       const params: any = {
-        page: 1,
-        limit: 100
+        page: targetPage,
+        limit
       };
 
       if (activeFilter !== 'all') {
@@ -73,48 +80,121 @@ const InstallationRequestsScreen = () => {
         params.orderType = typeFilter;
       }
 
+      console.log('Fetching requests with params:', params);
+      console.log('Active filter:', activeFilter);
+      console.log('Type filter:', typeFilter);
+
       const result = await apiService.get('/installation-requests', { params });
-  
+      
+      console.log('result is ',JSON.stringify(result,null,2));
 
       if (result.success && result.data && Array.isArray(result.data.installationRequests)) {
-        setRequests(result.data.installationRequests);
+        const list: InstallationRequest[] = result.data.installationRequests;
+        const pagination = (result.data as any)?.pagination;
+        setRequests(prev => (append ? [...prev, ...list] : list));
+        if (pagination && typeof pagination.totalPages === 'number') {
+          setHasMore(targetPage < pagination.totalPages);
+        } else {
+          setHasMore(list.length >= limit);
+        }
+        setPage(targetPage);
       } else {
         setRequests([]);
+        setHasMore(false);
       }
     } catch (error) {
    
       setRequests([]);
+      setHasMore(false);
     }
     setLoading(false);
     setRefreshing(false);
+    setLoadingMore(false);
   };
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchRequests();
+    fetchRequests(false, 1);
   };
 
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: () => (
-        <Text
-          style={{
-            fontSize: 20,
-            fontFamily: 'Outfit_700Bold',
-            color: '#121516',
-          }}
-        >
-          INSTALLATION REQUESTS
-        </Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>
+            INSTALLATION REQUESTS
+          </Text>
+          <TouchableOpacity
+            onPress={handleRefresh}
+            style={styles.headerRefreshButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="refresh" size={20} color="#007bff" />
+          </TouchableOpacity>
+        </View>
       ),
       headerTitleAlign: 'center',
       headerShadowVisible: false
     });
   }, [navigation]);
 
+  // Set initial filters from URL parameters
   useEffect(() => {
-    fetchRequests();
+    console.log('Orders screen - URL params:', { status, orderType });
+    if (status && typeof status === 'string') {
+      console.log('Setting status filter to:', status);
+      setActiveFilter(status as FilterType);
+    }
+    if (orderType && typeof orderType === 'string') {
+      console.log('Setting order type filter to:', orderType);
+      setTypeFilter(orderType as OrderTypeFilter);
+    }
+  }, [status, orderType]);
+
+  // Auto-scroll to active filter button
+  useEffect(() => {
+    console.log('Auto-scroll effect triggered for filter:', activeFilter);
+    if (activeFilter && filterScrollViewRef.current && filterButtonRefs.current[activeFilter]) {
+      const activeButton = filterButtonRefs.current[activeFilter];
+      if (activeButton) {
+        console.log('Found active button, measuring layout...');
+        // Delay to ensure the button is rendered
+        setTimeout(() => {
+          activeButton.measureLayout(
+            filterScrollViewRef.current as any,
+            (x: number, y: number, width: number, height: number) => {
+              const scrollX = Math.max(0, x - 50); // 50px padding from left
+              console.log('Scrolling to position:', scrollX);
+              filterScrollViewRef.current?.scrollTo({
+                x: scrollX,
+                animated: true
+              });
+            },
+            () => {
+              console.log('Could not measure filter button layout');
+            }
+          );
+        }, 100);
+      } else {
+        console.log('Active button not found in refs');
+      }
+    } else {
+      console.log('Missing requirements for auto-scroll:', {
+        activeFilter,
+        scrollViewRef: !!filterScrollViewRef.current,
+        buttonRef: !!filterButtonRefs.current[activeFilter]
+      });
+    }
+  }, [activeFilter]);
+
+  useEffect(() => {
+    fetchRequests(false, 1);
   }, [activeFilter, typeFilter]);
+
+  const handleLoadMore = () => {
+    if (loadingMore || loading || !hasMore) return;
+    fetchRequests(true, page + 1);
+  };
 
   // Calculate statistics
   const submittedRequests = requests.filter(r => r.status === 'SUBMITTED').length;
@@ -128,11 +208,11 @@ const InstallationRequestsScreen = () => {
   // Status filter buttons
   const statusFilters = [
     { key: 'all', icon: 'list', label: 'All', value: requests.length, color: '#3B82F6', bgColor: '#EEF2FF' },
+    { key: 'INSTALLATION_COMPLETED', icon: 'checkmark-done', label: 'Completed', value: completedRequests, color: '#059669', bgColor: '#D1FAE5' },
     { key: 'SUBMITTED', icon: 'add-circle', label: 'Submitted', value: submittedRequests, color: '#6B7280', bgColor: '#F9FAFB' },
     { key: 'FRANCHISE_CONTACTED', icon: 'call', label: 'Contacted', value: franchiseContactedRequests, color: '#8B5CF6', bgColor: '#F3E8FF' },
     { key: 'INSTALLATION_SCHEDULED', icon: 'calendar', label: 'Scheduled', value: scheduledRequests, color: '#F59E0B', bgColor: '#FFFBEB' },
     { key: 'INSTALLATION_IN_PROGRESS', icon: 'construct', label: 'In Progress', value: inProgressRequests, color: '#10B981', bgColor: '#ECFDF5' },
-    { key: 'INSTALLATION_COMPLETED', icon: 'checkmark-done', label: 'Completed', value: completedRequests, color: '#059669', bgColor: '#D1FAE5' },
     { key: 'CANCELLED', icon: 'close-circle', label: 'Cancelled', value: cancelledRequests, color: '#EF4444', bgColor: '#FEF2F2' },
     { key: 'REJECTED', icon: 'close', label: 'Rejected', value: rejectedRequests, color: '#DC2626', bgColor: '#FEF2F2' },
   ];
@@ -219,6 +299,7 @@ const InstallationRequestsScreen = () => {
 
         {/* Status Filter Buttons */}
         <ScrollView
+          ref={filterScrollViewRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.filterScrollView}
@@ -227,6 +308,9 @@ const InstallationRequestsScreen = () => {
           {statusFilters.map((filter) => (
             <TouchableOpacity
               key={filter.key}
+              ref={(ref) => {
+                filterButtonRefs.current[filter.key] = ref;
+              }}
               style={[
                 styles.filterButton,
                 { backgroundColor: filter.bgColor },
@@ -276,8 +360,11 @@ const InstallationRequestsScreen = () => {
                 key={request.id}
                 style={styles.requestCard}
                 onPress={() => {
-               
-                  router.push(`/orders/${request.id}`);
+                  if (request.orderType === 'PURCHASE') {
+                    // router.push(`/products/${request.productId}`);
+                  } else {
+                    router.push(`/orders/${request.id}`);
+                  }
                 }}
                 activeOpacity={0.7}
               >
@@ -298,8 +385,12 @@ const InstallationRequestsScreen = () => {
                     </View>
                     <Text style={styles.productName} numberOfLines={1}>{request.product.name}</Text>
                     <Text style={styles.customerInfo} numberOfLines={1}>
-                      <Ionicons name="person" size={12} color="#6B7280" />
-                      {' '}{request.customer.name || request.name}
+                      <Ionicons name="person" size={12} color="#6B7280" />{' '}
+                      {request.customer.name || request.name}
+                    </Text>
+                    <Text style={styles.customerInfo} numberOfLines={1}>
+                      <Ionicons name="call" size={12} color="#6B7280" />{' '}
+                      {request.customer.phone || request.phoneNumber}
                     </Text>
                     <Text style={styles.franchiseInfo} numberOfLines={1}>
                       <Ionicons name="business" size={12} color="#6B7280" />
@@ -374,6 +465,13 @@ const InstallationRequestsScreen = () => {
             );
           })
         )}
+        {hasMore && (
+          <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+            <TouchableOpacity disabled={loadingMore} onPress={handleLoadMore} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: '#EEF2FF' }}>
+              <Text style={{ color: '#3B82F6', fontFamily: 'Outfit_600SemiBold' }}>{loadingMore ? 'Loading...' : 'Load More'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </SkeletonWrapper>
     </View>
   );
@@ -385,6 +483,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingRight: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: 'Outfit_700Bold',
+    color: '#121516',
+    flex: 1,
+  },
+  headerRefreshButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginLeft: 12,
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -420,7 +542,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   filterContainer: {
-    paddingHorizontal: 0,
+    paddingHorizontal: 16,
     gap: 12,
   },
   filterButton: {

@@ -1,12 +1,12 @@
 import { apiService } from '@/lib/api/api';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
-import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { ActionSheetIOS, Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { ActionSheetIOS, Alert, Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'active' | 'pending' | 'expired' | 'recent';
 
@@ -239,7 +239,7 @@ const SubscriptionsScreen = () => {
                 }
             );
         } else {
-            const alertOptions = [
+            const alertOptions: Array<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }> = [
                 { text: 'View Details', onPress: () => handleActionSheetResponse(subscription, 0) },
                 { text: 'View Customer', onPress: () => handleActionSheetResponse(subscription, 1) },
                 { text: 'View Product', onPress: () => handleActionSheetResponse(subscription, 2) },
@@ -371,7 +371,7 @@ const SubscriptionsScreen = () => {
                                             />
                                         ) : (
                                             <View style={styles.productImagePlaceholder}>
-                                                <MaterialIcons name="inventory" size={24} color="#9CA3AF" />
+                                                <Ionicons name="cube" size={20} color="#9CA3AF" />
                                             </View>
                                         )}
                                         <View style={styles.productDetails}>
@@ -465,10 +465,10 @@ const SubscriptionsScreen = () => {
                                             <Text style={styles.amountLabel}>Monthly</Text>
                                             <Text style={styles.amountValue}>{formatCurrency(item.monthlyAmount)}</Text>
                                         </View>
-                                        <View style={styles.amountBox}>
+                                        {/* <View style={styles.amountBox}>
                                             <Text style={styles.amountLabel}>Deposit</Text>
                                             <Text style={styles.amountValue}>{formatCurrency(item.depositAmount)}</Text>
-                                        </View>
+                                        </View> */}
                                         <View style={styles.installationStatus}>
                                             <Text style={styles.installationLabel}>Installation</Text>
                                             <Text style={[

@@ -334,11 +334,11 @@ const CancelSubscriptionsScreen = () => {
                             <View style={styles.franchiseSection}>
                                 <View style={styles.franchiseInfo}>
                                     <Ionicons name="business" size={14} color="#6B7280" />
-                                    <Text style={styles.franchiseName}>{request.subscriptions.franchise.name}</Text>
+                                    <Text style={styles.franchiseName}>{request.subscriptions.franchise?.name}</Text>
                                 </View>
                                 <View style={styles.franchiseLocation}>
                                     <Ionicons name="location-outline" size={12} color="#9CA3AF" />
-                                    <Text style={styles.franchiseCity}>{request.subscriptions.franchise.city}</Text>
+                                    <Text style={styles.franchiseCity}>{request.subscriptions.franchise?.city}</Text>
                                 </View>
                             </View>
 

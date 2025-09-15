@@ -3,8 +3,8 @@ import { apiService } from '@/lib/api/api';
 import FranchiseSkeleton from '@/lib/components/skeltons/FranchisesSkelton';
 import SkeletonWrapper from '@/lib/components/skeltons/SkeltonScrollRefreshWrapper';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router, useNavigation } from 'expo-router';
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type FilterType = 'all' | 'created' | 'assigned' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -39,21 +39,26 @@ const ServiceRequestsScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
     const [typeFilter, setTypeFilter] = useState<ServiceTypeFilter>('all');
-
+    
+    const params = useLocalSearchParams();
+    const statusFilterScrollViewRef = useRef<ScrollView>(null);
     const navigation = useNavigation();
 
     useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: () => (
-                <Text
-                    style={{
-                        fontSize: 20, // equivalent to text-2xl
-                        fontFamily: 'Outfit_700Bold', // equivalent to font-grotesk-bold
-                        color: '#121516',
-                    }}
-                >
-                    SERVICES
-                </Text>
+                <View style={styles.headerContainer}>
+                    <Text style={styles.headerTitle}>
+                        SERVICES
+                    </Text>
+                    <TouchableOpacity
+                        onPress={handleRefresh}
+                        style={styles.headerRefreshButton}
+                        activeOpacity={0.7}
+                    >
+                        <Ionicons name="refresh" size={20} color="#007bff" />
+                    </TouchableOpacity>
+                </View>
             ),
             headerTitleAlign: 'center',
             headerShadowVisible :false
@@ -91,6 +96,51 @@ const ServiceRequestsScreen = () => {
     useEffect(() => {
         fetchServiceRequests();
     }, []);
+
+    // Handle tab parameter from dashboard navigation
+    useEffect(() => {
+        if (params.tab) {
+            const tab = params.tab as string;
+            let targetFilter: FilterType = 'all';
+            
+            // Map dashboard tabs to service filters
+            switch (tab) {
+                case 'overview':
+                    targetFilter = 'all';
+                    break;
+                case 'assigned':
+                    targetFilter = 'assigned';
+                    break;
+                case 'scheduled':
+                    targetFilter = 'scheduled';
+                    break;
+                case 'in-progress':
+                    targetFilter = 'in_progress';
+                    break;
+                case 'completed':
+                    targetFilter = 'completed';
+                    break;
+                default:
+                    targetFilter = 'all';
+            }
+            
+            // Set the active filter
+            setActiveFilter(targetFilter);
+            
+            // Scroll to the appropriate filter button
+            setTimeout(() => {
+                if (statusFilterScrollViewRef.current) {
+                    const filterIndex = statusFilters.findIndex(f => f.key === targetFilter);
+                    if (filterIndex > 0) {
+                        statusFilterScrollViewRef.current.scrollTo({
+                            x: filterIndex * 120, // Approximate width of each filter button
+                            animated: true
+                        });
+                    }
+                }
+            }, 100);
+        }
+    }, [params.tab]);
 
     // Calculate statistics
     const createdRequests = serviceRequests.filter(sr => sr.status === 'CREATED').length;
@@ -215,6 +265,7 @@ const ServiceRequestsScreen = () => {
 
                 {/* Status Filter Buttons */}
                 <ScrollView
+                    ref={statusFilterScrollViewRef}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     style={styles.filterScrollView}
@@ -389,6 +440,30 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F8FAFC',
+    },
+    headerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingRight: 16,
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontFamily: 'Outfit_700Bold',
+        color: '#121516',
+        flex: 1,
+    },
+    headerRefreshButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginLeft: 12,
     },
     scrollContent: {
         paddingHorizontal: 16,

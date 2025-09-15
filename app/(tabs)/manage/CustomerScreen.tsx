@@ -18,65 +18,25 @@ const CustomerScreen = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const result = await apiService.get('/customers');
-      const data = result?.data || [];
-      if (!data || data.length === 0) {
-        setCustomers([
-          {
-            id: 'dummy-1',
-            name: 'Ravi Teja',
-            phone: '+91 9876543210',
-            email: 'ravi@example.com',
-            address: 'Hyderabad, Telangana',
-            createdAt: '2023-05-12T12:00:00Z',
-            isActive: true,
-            totalOrders: 12,
-            totalSpent: '₹45,000',
-            joinDate: new Date('2023-05-12'),
-            isPremium: true,
-          },
-          {
-            id: 'dummy-2',
-            name: 'Sita Ram',
-            phone: '+91 9988776655',
-            email: 'sita@example.com',
-            address: 'Bangalore, Karnataka',
-            createdAt: '2024-01-22T10:00:00Z',
-            isActive: false,
-            totalOrders: 3,
-            totalSpent: '₹8,500',
-            joinDate: new Date('2024-01-22'),
-            isPremium: false,
-          },
-          {
-            id: 'dummy-3',
-            name: 'Arjun Kumar',
-            phone: '+91 8877665544',
-            email: 'arjun@example.com',
-            address: 'Chennai, Tamil Nadu',
-            createdAt: '2024-11-15T08:30:00Z',
-            isActive: true,
-            totalOrders: 7,
-            totalSpent: '₹22,000',
-            joinDate: new Date('2024-11-15'),
-            isPremium: false,
-          },
-          {
-            id: 'dummy-4',
-            name: 'Priya Sharma',
-            phone: '+91 7766554433',
-            email: 'priya@example.com',
-            address: 'Mumbai, Maharashtra',
-            createdAt: '2024-12-01T14:20:00Z',
-            isActive: true,
-            totalOrders: 25,
-            totalSpent: '₹85,000',
-            joinDate: new Date('2024-12-01'),
-            isPremium: true,
-          },
-        ]);
+      const result = await apiService.get('/auth/admin/customers');
+      const list = (result?.data as any)?.customers;
+      if (result.success && Array.isArray(list)) {
+        const mapped = list.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          phone: c.phoneNumber,
+          email: '',
+          address: c.city || '',
+          createdAt: c.joinedToPlatform,
+          isActive: String(c.status).toLowerCase() === 'active',
+          totalOrders: c.subscriptionsCount ?? 0,
+          totalSpent: '—',
+          joinDate: c.joinedToPlatform ? new Date(c.joinedToPlatform) : null,
+          isPremium: false,
+        }));
+        setCustomers(mapped);
       } else {
-        setCustomers(data);
+        setCustomers([]);
       }
     } catch (error) {
       console.log('Failed to fetch customers:', error);
@@ -211,7 +171,7 @@ const CustomerScreen = () => {
             <TouchableOpacity
               key={item.id}
               style={styles.customerCard}
-              onPress={() => router.push('/customers/deba318b-6b12-4882-8e39-d6debe416854')}
+              onPress={() => router.push(`/customers/${item.id}`)}
               activeOpacity={0.7}
             >
               {/* Customer Header */}
@@ -233,10 +193,10 @@ const CustomerScreen = () => {
                       <Ionicons name="call" size={12} color="#6B7280" />
                       {' '}{item.phone}
                     </Text>
-                    <Text style={styles.customerEmail} numberOfLines={1}>
+                    {/* <Text style={styles.customerEmail} numberOfLines={1}>
                       <Ionicons name="mail" size={12} color="#6B7280" />
                       {' '}{item.email}
-                    </Text>
+                    </Text> */}
                   </View>
                 </View>
                 <View style={styles.statusAndActions}>
@@ -272,13 +232,10 @@ const CustomerScreen = () => {
 
                 <View style={styles.metricsRow}>
                   <View style={styles.metricBox}>
-                    <Text style={styles.metricLabel}>Orders</Text>
+                    <Text style={styles.metricLabel}>Subscriptions</Text>
                     <Text style={styles.metricValue}>{item.totalOrders}</Text>
                   </View>
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricLabel}>Total Spent</Text>
-                    <Text style={styles.metricValue}>{item.totalSpent}</Text>
-                  </View>
+                  
                   <View style={styles.metricBox}>
                     <Text style={styles.metricLabel}>Joined</Text>
                     <Text style={styles.metricValue}>

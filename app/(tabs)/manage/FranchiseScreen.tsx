@@ -133,11 +133,12 @@ const FranchiseScreen = () => {
   }, []);
 
   const showActionSheet = (franchise: any) => {
+    const statusAction = franchise.status === 'Active' ? 'Deactivate' : 'Activate';
     const options = [
       'View Details',
       'Edit Franchise',
-      'View  Franchise',
-      franchise.status === 'Active' ? 'Deactivate' : 'Activate',
+      'View Franchise',
+      statusAction,
       'Cancel'
     ];
 
@@ -163,9 +164,9 @@ const FranchiseScreen = () => {
         [
           { text: 'View Details', onPress: () => handleActionSheetResponse(franchise, 0) },
           { text: 'Edit Franchise', onPress: () => handleActionSheetResponse(franchise, 1) },
-          { text: 'view Franchise', onPress: () => handleActionSheetResponse(franchise, 2) },
+          { text: 'View Franchise', onPress: () => handleActionSheetResponse(franchise, 2) },
           {
-            text: franchise.status === 'Active' ? 'Deactivate' : 'Activate',
+            text: statusAction,
             style: franchise.status === 'Active' ? 'destructive' : 'default',
             onPress: () => handleActionSheetResponse(franchise, 3)
           },
@@ -177,7 +178,36 @@ const FranchiseScreen = () => {
   };
 
   const updateFranchiseStatus = async (id: string, status: boolean) => {
-    // Implementation for updating franchise status
+    try {
+      const statusPayload = {
+        status: status ? 'ACTIVE' : 'INACTIVE'
+      };
+
+      const result = await apiService.patch(`/franchises/${id}/status`, statusPayload, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (result.success) {
+        // Update local state
+        setFranchises(prev => 
+          prev.map(franchise => 
+            franchise.id === id 
+              ? { ...franchise, status: status ? 'Active' : 'Pending' }
+              : franchise
+          )
+        );
+        
+        Alert.alert(
+          'Success', 
+          `Franchise ${status ? 'activated' : 'deactivated'} successfully`
+        );
+      } else {
+        Alert.alert('Error', 'Failed to update franchise status');
+      }
+    } catch (error) {
+      console.log('Failed to update franchise status:', error);
+      Alert.alert('Error', 'Failed to update franchise status');
+    }
   };
 
   const handleViewAsFranchise = (franchise: any) => {
@@ -336,6 +366,23 @@ const FranchiseScreen = () => {
                       {item.status}
                     </Text>
                   </View>
+                  
+                  {/* Quick Status Toggle */}
+                  <TouchableOpacity 
+                    style={[
+                      styles.quickToggleButton,
+                      item.status === 'Active' ? styles.quickToggleActive : styles.quickToggleInactive
+                    ]}
+                    onPress={() => updateFranchiseStatus(item.id, item.status !== 'Active')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons 
+                      name={item.status === 'Active' ? 'pause' : 'play'} 
+                      size={14} 
+                      color={item.status === 'Active' ? '#DC2626' : '#10B981'} 
+                    />
+                  </TouchableOpacity>
+                  
                   <TouchableOpacity style={styles.editButton}>
                     <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                   </TouchableOpacity>
@@ -363,10 +410,7 @@ const FranchiseScreen = () => {
                     <Text style={styles.metricLabel}>Established</Text>
                     <Text style={styles.metricValue}>{item.year}</Text>
                   </View>
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricLabel}>Outlets</Text>
-                    <Text style={styles.metricValue}>{item.outlets}</Text>
-                  </View>
+                
                   <View style={styles.metricBox}>
                     <Text style={styles.metricLabel}>Employees</Text>
                     <Text style={styles.metricValue}>{item.employees}</Text>
@@ -636,5 +680,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  quickToggleButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  quickToggleActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  quickToggleInactive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
   },
 });

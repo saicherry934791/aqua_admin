@@ -1,8 +1,8 @@
 import { apiService } from '@/lib/api/api';
-import { ComparisonBarChart } from '@/lib/components/grphs/ComparisonBarChart';
 import { ComparisonLineChart } from '@/lib/components/grphs/ComparisonLineChart';
 import { DistributionPieChart } from '@/lib/components/grphs/DistributionPieChart';
 import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
 import { Activity, ChartBar as BarChart3, Bell, Calendar, DollarSign, LocationEdit as Edit3, MapPin, Package, TrendingUp, Users, Wrench } from 'lucide-react-native';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
@@ -48,7 +48,7 @@ const StatCard = ({
   title: string,
   value: string,
   icon?: any,
-  trend?: string,
+  trend?: string | null,
   color?: string,
   onPress?: () => void
 }) => (
@@ -109,7 +109,7 @@ export default function DashboardScreen() {
 
   const navigation = useNavigation();
 
-  function getLocalDateString(date) {
+  function getLocalDateString(date: Date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -145,14 +145,14 @@ export default function DashboardScreen() {
   // Transform time series data for line charts
   const transformTimeSeriesData = (timeSeriesData: any) => {
     // Extract dates from all time series
-    const allDates = new Set();
-    Object.values(timeSeriesData).forEach((series: any[]) => {
-      series.forEach(item => allDates.add(item.date));
+    const allDates = new Set<string>();
+    Object.values(timeSeriesData as Record<string, { date: string }[]>).forEach((series) => {
+      (series || []).forEach((item) => allDates.add(item.date));
     });
 
-    const sortedDates = Array.from(allDates).sort();
-    const labels = sortedDates.map(date => {
-      const d = new Date(date);
+    const sortedDates = Array.from(allDates.values()).sort();
+    const labels = sortedDates.map((dateStr: string) => {
+      const d = new Date(dateStr);
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
 
@@ -160,8 +160,8 @@ export default function DashboardScreen() {
 
     // Revenue data
     if (timeSeriesData.revenue) {
-      const revenueData = sortedDates.map(date => {
-        const item = timeSeriesData.revenue.find(r => r.date === date);
+      const revenueData = sortedDates.map((date) => {
+        const item = (timeSeriesData.revenue as { date: string; revenue: number }[]).find((r) => r.date === date);
         return item ? item.revenue : 0;
       });
       datasets.push({
@@ -172,8 +172,8 @@ export default function DashboardScreen() {
 
     // Installation requests
     if (timeSeriesData.installationRequests) {
-      const installationData = sortedDates.map(date => {
-        const item = timeSeriesData.installationRequests.find(r => r.date === date);
+      const installationData = sortedDates.map((date) => {
+        const item = (timeSeriesData.installationRequests as { date: string; count: number }[]).find((r) => r.date === date);
         return item ? item.count : 0;
       });
       datasets.push({
@@ -184,8 +184,8 @@ export default function DashboardScreen() {
 
     // Subscriptions
     if (timeSeriesData.subscriptions) {
-      const subscriptionData = sortedDates.map(date => {
-        const item = timeSeriesData.subscriptions.find(r => r.date === date);
+      const subscriptionData = sortedDates.map((date) => {
+        const item = (timeSeriesData.subscriptions as { date: string; count: number }[]).find((r) => r.date === date);
         return item ? item.count : 0;
       });
       datasets.push({
@@ -196,8 +196,8 @@ export default function DashboardScreen() {
 
     // Service completions for agents
     if (timeSeriesData.dailyCompletions) {
-      const completionData = sortedDates.map(date => {
-        const item = timeSeriesData.dailyCompletions.find(r => r.date === date);
+      const completionData = sortedDates.map((date) => {
+        const item = (timeSeriesData.dailyCompletions as { date: string; count: number }[]).find((r) => r.date === date);
         return item ? item.count : 0;
       });
       datasets.push({
@@ -334,6 +334,13 @@ export default function DashboardScreen() {
               <Edit3 size={16} color="#007bff" style={styles.headerDateIcon} />
             </TouchableOpacity>
           </View>
+          <TouchableOpacity
+            onPress={fetchDashboardData}
+            style={styles.headerRefreshButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="refresh" size={20} color="#007bff" />
+          </TouchableOpacity>
         </View>
       ),
       headerTitleAlign: 'left',
@@ -353,7 +360,7 @@ export default function DashboardScreen() {
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
           { key: 'trends', title: 'Trends', icon: BarChart3 },
-          { key: 'analytics', title: 'Analytics', icon: DollarSign }
+          // { key: 'analytics', title: 'Analytics', icon: DollarSign }
         ];
       case UserRole.FRANCHISE_OWNER:
         return [
@@ -365,7 +372,7 @@ export default function DashboardScreen() {
         return [
           { key: 'overview', title: 'Overview', icon: Activity },
           { key: 'trends', title: 'Trends', icon: BarChart3 },
-          { key: 'tasks', title: 'My Tasks', icon: Wrench }
+          // { key: 'tasks', title: 'My Tasks', icon: Wrench }
         ];
       default:
         return [{ key: 'overview', title: 'Overview', icon: Activity }];
@@ -419,33 +426,30 @@ export default function DashboardScreen() {
                 icon={DollarSign}
                 trend={formatTrend(stats.revenueChange)}
                 color="#10B981"
-                onPress={() => router.push('/finance')}
+                onPress={() => router.push('/(tabs)/manage?tab=Revenue' as any)}
               />
               <StatCard
-                title="Active Franchises"
+                title="Total Franchises"
                 value={(stats.totalFranchises || 0).toString()}
                 icon={MapPin}
                 color="#007bff"
-                onPress={() => router.push({
-                  pathname: '/manage',
-                  params: { tab: 'Franchises' },
-                })}
+                onPress={() => router.push('/(tabs)/manage?tab=Franchises' as any)}
               />
               <StatCard
-                title="Installation Requests"
+                title="Total Install Requests"
                 value={(stats.totalInstallationRequests || 0).toString()}
                 icon={Package}
                 trend={formatTrend(stats.installationRequestsChange)}
                 color="#F59E0B"
-                onPress={() => router.push('/orders')}
+                onPress={() => router.push('/(tabs)/orders' as any)}
               />
               <StatCard
-                title="Service Requests"
+                title="Total Service Requests"
                 value={(stats?.totalServiceRequests || 0).toString()}
                 icon={Wrench}
                 trend={formatTrend(stats.serviceRequestsChange)}
                 color="#EF4444"
-                onPress={() => router.push('/service')}
+                onPress={() => router.push('/(tabs)/service' as any)}
               />
             </View>
 
@@ -457,25 +461,29 @@ export default function DashboardScreen() {
                 icon={Users}
                 trend={formatTrend(stats.customersChange)}
                 color="#8B5CF6"
+                onPress={() => router.push('/(tabs)/manage?tab=Customers' as any)}
               />
               <StatCard
-                title="Active Subscriptions"
+                title="Total Subscriptions"
                 value={(stats.activeSubscriptions || 0).toString()}
                 icon={Activity}
                 trend={formatTrend(stats.subscriptionsChange)}
                 color="#06B6D4"
+                onPress={() => router.push('/(tabs)/manage?tab=Subscriptions' as any)}
               />
               <StatCard
                 title="Service Agents"
                 value={(stats.totalServiceAgents || 0).toString()}
                 icon={Users}
                 color="#F97316"
+                onPress={() => router.push('/(tabs)/manage?tab=Agents' as any)}
               />
               <StatCard
                 title="Completed Installs"
                 value={(stats.completedInstallationRequests || 0).toString()}
                 icon={TrendingUp}
                 color="#10B981"
+                onPress={() => router.push('/(tabs)/orders?status=INSTALLATION_COMPLETED' as any)}
               />
             </View>
 
@@ -488,17 +496,21 @@ export default function DashboardScreen() {
                   subtitle="View & assign areas"
                   icon={MapPin}
                   color="#007bff"
-                  onPress={() => router.push({
-                    pathname: '/manage',
-                    params: { tab: 'Franchises' },
-                  })}
+                  onPress={() => router.push('/(tabs)/manage?tab=Franchises' as any)}
                 />
                 <QuickActionCard
                   title="System Analytics"
                   subtitle="Performance insights"
                   icon={TrendingUp}
                   color="#10B981"
-                  onPress={() => setActiveTab('analytics')}
+                  onPress={() => setActiveTab('trends')}
+                />
+                <QuickActionCard
+                  title="Orders"
+                  subtitle="View all orders"
+                  icon={Package}
+                  color="#F59E0B"
+                  onPress={() => router.push('/(tabs)/orders' as any)}
                 />
               </View>
             </View>
@@ -534,7 +546,7 @@ export default function DashboardScreen() {
               )}
 
               {/* Time Series Charts */}
-              {timeSeriesData && (
+              {/* {timeSeriesData && (
                 <>
                   <ComparisonLineChart
                     data={transformTimeSeriesData(timeSeriesData)}
@@ -543,7 +555,7 @@ export default function DashboardScreen() {
                   />
                   <View style={styles.chartSpacing} />
                 </>
-              )}
+              )} */}
             </View>
           </View>
         );
@@ -558,24 +570,28 @@ export default function DashboardScreen() {
                 icon={DollarSign}
                 trend={formatTrend(stats.revenueChange)}
                 color="#10B981"
+                onPress={() => router.push('/(tabs)/revenue' as any)}
               />
               <StatCard
                 title="Revenue Growth"
                 value={`${stats.revenueChange || 0}%`}
                 icon={TrendingUp}
                 color="#007bff"
+                onPress={() => router.push('/(tabs)/revenue' as any)}
               />
               <StatCard
                 title="Customer Growth"
                 value={`${stats.customersChange || 0}%`}
                 icon={Users}
                 color="#F59E0B"
+                onPress={() => router.push('/(tabs)/manage?tab=Customers' as any)}
               />
               <StatCard
                 title="Service Efficiency"
                 value={`${Math.round(((stats.completedServiceRequests || 0) / (stats?.totalServiceRequests || 1)) * 100)}%`}
                 icon={Activity}
                 color="#8B5CF6"
+                onPress={() => router.push('/(tabs)/service' as any)}
               />
             </View>
 
@@ -632,6 +648,7 @@ export default function DashboardScreen() {
                 icon={DollarSign}
                 trend={formatTrend(stats.revenueChange)}
                 color="#10B981"
+                onPress={() => router.push('/(tabs)/manage?tab=Revenue' as any)}
               />
               <StatCard
                 title="Installation Requests"
@@ -639,40 +656,44 @@ export default function DashboardScreen() {
                 icon={Package}
                 trend={formatTrend(stats.installationRequestsChange)}
                 color="#007bff"
+                onPress={() => router.push('/(tabs)/orders' as any)}
               />
-              <StatCard
+              {/* <StatCard
                 title="Customers"
                 value={(stats.totalCustomers || 0).toString()}
                 icon={Users}
                 color="#F59E0B"
-              />
+                onPress={() => router.push('/(tabs)/manage?tab=Customers' as any)}
+              /> */}
               <StatCard
                 title="Service Requests"
                 value={(stats?.totalServiceRequests || 0).toString()}
                 icon={Wrench}
                 trend={formatTrend(stats.serviceRequestsChange)}
                 color="#EF4444"
+                onPress={() => router.push('/(tabs)/service' as any)}
               />
-            </View>
-
-            <View style={styles.statsGrid}>
-              <StatCard
+          
+              {/* <StatCard
                 title="Active Subscriptions"
                 value={(stats.activeSubscriptions || 0).toString()}
                 icon={Activity}
                 color="#8B5CF6"
-              />
+                onPress={() => router.push('/(tabs)/manage?tab=Subscriptions' as any)}
+              /> */}
               <StatCard
                 title="Completed Installs"
                 value={(stats.completedInstallationRequests || 0).toString()}
                 icon={TrendingUp}
                 color="#10B981"
+                onPress={() => router.push('/(tabs)/orders?status=INSTALLATION_COMPLETED' as any)}
               />
               <StatCard
                 title="Cancel Requests"
                 value={(stats.cancelSubscriptionRequestsActive || 0).toString()}
                 icon={Bell}
                 color="#EF4444"
+                onPress={() => router.push('/(tabs)/manage?tab=Cancel Requests' as any)}
               />
               <StatCard
                 title="Total Subscriptions"
@@ -680,10 +701,11 @@ export default function DashboardScreen() {
                 icon={Package}
                 trend={formatTrend(stats.subscriptionsChange)}
                 color="#06B6D4"
+                onPress={() => router.push('/(tabs)/subscriptions' as any)}
               />
             </View>
 
-            <View style={styles.quickActionsSection}>
+            {/* <View style={styles.quickActionsSection}>
               <Text style={styles.sectionTitle}>Quick Actions</Text>
               <View style={styles.quickActionsGrid}>
                 <QuickActionCard
@@ -691,20 +713,24 @@ export default function DashboardScreen() {
                   subtitle="View customer list"
                   icon={Users}
                   color="#007bff"
-                  onPress={() => router.push({
-                    pathname: '/manage',
-                    params: { tab: 'Customers' },
-                  })}
+                  onPress={() => router.push('/(tabs)/manage?tab=Customers' as any)}
                 />
                 <QuickActionCard
                   title="Installation Tracking"
                   subtitle="Track installations"
                   icon={Package}
                   color="#10B981"
-                  onPress={() => router.push('/orders')}
+                  onPress={() => router.push('/(tabs)/orders' as any)}
+                />
+                <QuickActionCard
+                  title="Service Requests"
+                  subtitle="Manage services"
+                  icon={Wrench}
+                  color="#EF4444"
+                  onPress={() => router.push('/(tabs)/service' as any)}
                 />
               </View>
-            </View>
+            </View> */}
           </View>
         );
 
@@ -757,24 +783,28 @@ export default function DashboardScreen() {
                 value={`${Math.round(((stats.completedInstallationRequests || 0) / (stats.totalInstallationRequests || 1)) * 100)}%`}
                 icon={Package}
                 color="#10B981"
+                onPress={() => router.push('/(tabs)/orders' as any)}
               />
               <StatCard
                 title="Service Rate"
                 value={`${Math.round(((stats.completedServiceRequests || 0) / (stats?.totalServiceRequests || 1)) * 100)}%`}
                 icon={Wrench}
                 color="#007bff"
+                onPress={() => router.push('/(tabs)/service' as any)}
               />
               <StatCard
                 title="Customer Retention"
                 value={`${Math.round(((stats.activeSubscriptions || 0) / (stats.totalSubscriptions || 1)) * 100)}%`}
                 icon={Users}
-                color="#F59E0B"
+                color="#8B5CF6"
+                onPress={() => router.push('/(tabs)/manage?tab=Customers' as any)}
               />
               <StatCard
                 title="Revenue Growth"
                 value={`${stats.revenueChange || 0}%`}
                 icon={TrendingUp}
                 color="#8B5CF6"
+                onPress={() => router.push('/(tabs)/revenue' as any)}
               />
             </View>
 
@@ -797,7 +827,7 @@ export default function DashboardScreen() {
     }
   };
 
-  const renderServiceAgentContent = () => {
+    const renderServiceAgentContent = () => {
     const { stats, pieCharts, timeSeriesData, upcomingRequests } = dashboardData;
 
     switch (activeTab) {
@@ -811,12 +841,14 @@ export default function DashboardScreen() {
                 icon={Wrench}
                 trend={formatTrend(stats.serviceRequestsChange)}
                 color="#007bff"
+                onPress={() => router.push('/(tabs)/service?tab=overview' as any)}
               />
               <StatCard
                 title="Assigned"
                 value={(stats.assignedServiceRequests || 0).toString()}
                 icon={Activity}
                 color="#F59E0B"
+                onPress={() => router.push('/(tabs)/service?tab=assigned' as any)}
               />
               <StatCard
                 title="Completed"
@@ -824,48 +856,15 @@ export default function DashboardScreen() {
                 icon={TrendingUp}
                 trend={formatTrend(stats.completedRequestsChange)}
                 color="#10B981"
+                onPress={() => router.push('/(tabs)/service?tab=completed' as any)}
               />
-
-
               <StatCard
                 title="Scheduled"
                 value={(stats.scheduledServiceRequests || 0).toString()}
                 icon={Calendar}
                 color="#06B6D4"
+                onPress={() => router.push('/(tabs)/service?tab=scheduled' as any)}
               />
-
-              <StatCard
-                title="Completion Rate"
-                value={`${Math.round(((stats.completedServiceRequests || 0) / (stats?.totalServiceRequests || 1)) * 100)}%`}
-                icon={Activity}
-                color="#10B981"
-              />
-              <StatCard
-                title="Weekly Target"
-                value="20"
-                icon={TrendingUp}
-                color="#EF4444"
-              />
-            </View>
-
-            <View style={styles.quickActionsSection}>
-              <Text style={styles.sectionTitle}>Quick Actions</Text>
-              <View style={styles.quickActionsGrid}>
-                <QuickActionCard
-                  title="View Requests"
-                  subtitle="Check assigned work"
-                  icon={Wrench}
-                  color="#007bff"
-                  onPress={() => router.push('/service')}
-                />
-                <QuickActionCard
-                  title="Today's Schedule"
-                  subtitle="View today's tasks"
-                  icon={Calendar}
-                  color="#10B981"
-                  onPress={() => router.push('/schedule')}
-                />
-              </View>
             </View>
           </View>
         );
@@ -919,24 +918,28 @@ export default function DashboardScreen() {
                 value={(stats?.totalServiceRequests || 0).toString()}
                 icon={Wrench}
                 color="#007bff"
+                onPress={() => router.push('/(tabs)/service?tab=overview' as any)}
               />
               <StatCard
                 title="In Progress"
                 value={(stats.inProgressServiceRequests || 0).toString()}
                 icon={Activity}
                 color="#F59E0B"
+                onPress={() => router.push('/(tabs)/service?tab=in-progress' as any)}
               />
               <StatCard
                 title="Scheduled"
                 value={(stats.scheduledServiceRequests || 0).toString()}
                 icon={Calendar}
                 color="#06B6D4"
+                onPress={() => router.push('/(tabs)/service?tab=scheduled' as any)}
               />
               <StatCard
                 title="Completed"
                 value={(stats.completedServiceRequests || 0).toString()}
                 icon={TrendingUp}
                 color="#10B981"
+                onPress={() => router.push('/(tabs)/service?tab=completed' as any)}
               />
             </View>
 
@@ -944,7 +947,7 @@ export default function DashboardScreen() {
             {upcomingRequests && upcomingRequests.length > 0 && (
               <View style={styles.upcomingSection}>
                 <Text style={styles.sectionTitle}>Upcoming Requests</Text>
-                {upcomingRequests.slice(0, 3).map((request, index) => (
+                {upcomingRequests.slice(0, 3).map((request: any, index: number) => (
                   <View key={index} style={styles.upcomingCard}>
                     <View style={styles.upcomingHeader}>
                       <Text style={styles.upcomingTitle}>{request.type || 'Service Request'}</Text>
@@ -966,14 +969,21 @@ export default function DashboardScreen() {
                   subtitle="View all assignments"
                   icon={Wrench}
                   color="#007bff"
-                  onPress={() => router.push('/service')}
+                  onPress={() => router.push('/(tabs)/service?tab=overview' as any)}
                 />
                 <QuickActionCard
                   title="Schedule"
                   subtitle="Check today's schedule"
                   icon={Calendar}
                   color="#10B981"
-                  onPress={() => router.push('/schedule')}
+                  onPress={() => router.push('/(tabs)/service?tab=scheduled' as any)}
+                />
+                <QuickActionCard
+                  title="Orders"
+                  subtitle="View installations"
+                  icon={Package}
+                  color="#F59E0B"
+                  onPress={() => router.push('/(tabs)/orders' as any)}
                 />
               </View>
             </View>
@@ -1037,11 +1047,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
+    paddingRight: 16,
   },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
   },
   headerTitle: {
     color: '#111618',
@@ -1066,6 +1077,17 @@ const styles = StyleSheet.create({
   },
   headerDateIcon: {
     marginLeft: 4,
+  },
+  headerRefreshButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginLeft: 12,
   },
   tabContainer: {
     backgroundColor: 'white',

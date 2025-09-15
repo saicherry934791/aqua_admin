@@ -194,7 +194,7 @@ const ProductScreen = () => {
   const handleActionSheetResponse = (product: any, buttonIndex: number) => {
     switch (buttonIndex) {
       case 0:
-        router.push(`/product/${product.id}`);
+        router.push(`/products/${product.id}`);
         break;
       case 1:
         handleEditProduct(product.id);
@@ -375,10 +375,10 @@ const ProductScreen = () => {
                     <Text style={styles.priceLabel}>Rent Price</Text>
                     <Text style={styles.priceValue}>{item.rentPrice}</Text>
                   </View>
-                  <View style={styles.priceBox}>
+                  {/* <View style={styles.priceBox}>
                     <Text style={styles.priceLabel}>Deposit</Text>
                     <Text style={styles.priceValue}>{item.deposit}</Text>
-                  </View>
+                  </View> */}
                 </View>
               </View>
             </TouchableOpacity>

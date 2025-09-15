@@ -315,6 +315,18 @@ export const ServiceRequestDetailsScreen = () => {
               />
             )}
 
+            {/* Service Images */}
+            <ServiceImageManager
+              serviceType={request.type}
+              currentStatus={request.status}
+              initialImages={request.images || []}
+              beforeImages={beforeImages}
+              afterImages={afterImages}
+              onBeforeImagesChange={setBeforeImages}
+              onAfterImagesChange={setAfterImages}
+              onViewImages={viewImages}
+            />
+
             {/* Service Details */}
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Service Details</Text>
@@ -565,17 +577,7 @@ export const ServiceRequestDetailsScreen = () => {
               </View>
             )}
 
-            {/* Service Images */}
-            <ServiceImageManager
-              serviceType={request.type}
-              currentStatus={request.status}
-              initialImages={request.images || []}
-              beforeImages={beforeImages}
-              afterImages={afterImages}
-              onBeforeImagesChange={setBeforeImages}
-              onAfterImagesChange={setAfterImages}
-              onViewImages={viewImages}
-            />
+
           </View>
         </TouchableWithoutFeedback>
       </ScrollView>

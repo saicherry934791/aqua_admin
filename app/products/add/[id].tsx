@@ -60,7 +60,7 @@ const ProductFormScreen = () => {
                     }),
                     rentPrice: data.rentPrice?.toString(),
                     buyPrice: data.buyPrice?.toString(),
-                    deposit: data.deposit?.toString(),
+                    // deposit: data.deposit?.toString(),
                     isRentable: data.isRentable ? 'true' : 'false',
                     isPurchasable: data.isPurchasable ? 'true' : 'false',
                     isActive: data.isActive ? 'true' : 'false',
@@ -84,7 +84,7 @@ const ProductFormScreen = () => {
             formData.append("description", values.product_info.description)
             formData.append("rentPrice", values.product_info.rentPrice)
             formData.append("buyPrice", values.product_info.buyPrice)
-            formData.append("deposit", values.product_info.deposit)
+            formData.append("deposit", "0")
             formData.append("isRentable", values.product_info.isRentable)
             formData.append("isPurchasable", values.product_info.isPurchasable)
             formData.append("isActive", values.product_info.isActive)
@@ -137,7 +137,7 @@ const ProductFormScreen = () => {
                 description: values.product_info.description,
                 price: `₹${values.product_info.buyPrice ?? 0}`,
                 rentPrice: `₹${values.product_info.rentPrice ?? 0}`,
-                deposit: `₹${values.product_info.deposit ?? 0}`,
+                // deposit: `₹${values.product_info.deposit ?? 0}`,
                 isActive: values.product_info.isActive === 'true',
                 isRentable: values.product_info.isRentable === 'true',
                 isPurchasable: values.product_info.isPurchasable === 'true',
@@ -259,21 +259,21 @@ const ProductFormScreen = () => {
                         },
                     },
                 },
-                {
-                    id: "deposit",
-                    type: "text",
-                    label: "Deposit ($)",
-                    placeholder: "Enter security deposit",
-                    required: true,
-                    validation: {
-                        pattern: /^\d+$/,
-                        custom: (value: string) => {
-                            const val = parseInt(value)
-                            if (isNaN(val) || val < 0) return "Deposit must be 0 or greater"
-                            return null
-                        },
-                    },
-                },
+                // {
+                //     id: "deposit",
+                //     type: "text",
+                //     label: "Deposit ($)",
+                //     placeholder: "Enter security deposit",
+                //     required: true,
+                //     validation: {
+                //         pattern: /^\d+$/,
+                //         custom: (value: string) => {
+                //             const val = parseInt(value)
+                //             if (isNaN(val) || val < 0) return "Deposit must be 0 or greater"
+                //             return null
+                //         },
+                //     },
+                // },
                 {
                     id: "isRentable",
                     type: "select",

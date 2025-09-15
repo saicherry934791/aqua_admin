@@ -168,7 +168,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
     try {
       await onSubmit(values)
       onSuccess?.(values)
-      Alert.alert("Success", "Form submitted successfully!")
+      // Alert.alert("Success", "Form submitted successfully!")
     } catch (error) {
       onError?.(error as Error)
       Alert.alert("Error", "Failed to submit form. Please try again.")

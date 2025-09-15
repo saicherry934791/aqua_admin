@@ -1,5 +1,5 @@
 import { apiService } from '@/lib/api/api';
-import { useAuth, UserRole } from '@/lib/contexts/AuthContext';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useNavigation } from 'expo-router';
 import React, { useEffect, useLayoutEffect, useState } from 'react';
@@ -41,21 +41,24 @@ const OpenServiceRequestsScreen = () => {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: () => (
-        <Text
-          style={{
-            fontSize: 20,
-            fontFamily: 'Outfit_700Bold',
-            color: '#121516',
-          }}
-        >
-          OPEN REQUESTS
-        </Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>
+            OPEN REQUESTS
+          </Text>
+          <View style={styles.headerRightContainer}>
+            <TouchableOpacity
+              onPress={handleRefresh}
+              style={styles.headerRefreshButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="refresh" size={20} color="#007bff" />
+            </TouchableOpacity>
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>{serviceRequests.length}</Text>
+            </View>
+          </View>
+        </View>
       ),
-      headerRight: () => <View style={{
-        paddingRight: 16
-      }}><View style={styles.headerBadge}>
-          <Text style={styles.headerBadgeText}>{serviceRequests.length}</Text>
-        </View></View>,
       headerTitleAlign: 'center',
       headerShadowVisible: false
     });
@@ -283,12 +286,12 @@ const OpenServiceRequestsScreen = () => {
                         <MaterialIcons name="person" size={16} color="#6B7280" />
                         <Text style={styles.infoText}>{request.customerName}</Text>
                       </View>
-                      <View style={styles.infoRow}>
+                      {/* <View style={styles.infoRow}>
                         <MaterialIcons name="location-on" size={16} color="#6B7280" />
                         <Text style={styles.infoText} numberOfLines={1}>
                           {request.customerAddress}
                         </Text>
-                      </View>
+                      </View> */}
                       <View style={styles.infoRow}>
                         <MaterialIcons name="phone" size={16} color="#6B7280" />
                         <Text style={styles.infoText}>{request.customerPhone}</Text>
@@ -359,6 +362,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingRight: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontFamily: 'Outfit_700Bold',
+    color: '#121516',
+    flex: 1,
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerRefreshButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -380,11 +411,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Outfit_700Bold',
-    color: '#111827',
   },
   headerBadge: {
     backgroundColor: '#3B82F6',
